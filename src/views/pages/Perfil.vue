@@ -2,7 +2,6 @@
 import Calendar from 'primevue/calendar';
 import Slider from 'primevue/slider';
 import { useToast } from 'primevue/usetoast';
-import * as QRCode from 'qrcode'; // Importación correcta
 import { ref } from 'vue';
 
 // Datos estáticos del perfil
@@ -22,20 +21,6 @@ const profile = ref({
 
 const toast = useToast();
 // Generar QR al cargar el componente
-const qrCodeUrl = ref('');
-
-// Método para generar el QR dinámicamente
-const generateQRCode = async () => {
-    try {
-        const qrData = JSON.stringify({
-            name: profile.value.name,
-            connectionType: profile.value.connectionType
-        });
-        qrCodeUrl.value = await QRCode.toDataURL(qrData);
-    } catch (error) {
-        console.error('Error generando el código QR:', error);
-    }
-};
 
 // Método para guardar el perfil (simulado)
 function saveProfile() {
@@ -47,8 +32,21 @@ function signOut() {
     toast.add({ severity: 'warn', summary: 'Cerrar Sesión', detail: 'Sesión cerrada', life: 3000 });
 }
 
-// Generar el QR inicialmente
-generateQRCode();
+// Método para generar un código aleatorio
+function generateConnectionCode(type) {
+    profile.value.connectionType = type;
+    profile.value.connectionCode = Math.random().toString(36).substr(2, 8).toUpperCase();
+    toast.add({ severity: 'info', summary: 'Código Generado', detail: `Código de conexión (${type}): ${profile.value.connectionCode}`, life: 5000 });
+}
+
+// Método para conectar usando el código ingresado
+function connectWithCode() {
+    if (profile.value.connectionCodeInput) {
+        toast.add({ severity: 'success', summary: 'Conectado', detail: `Conectado con el código: ${profile.value.connectionCodeInput}`, life: 3000 });
+    } else {
+        toast.add({ severity: 'error', summary: 'Error', detail: 'Introduce un código válido', life: 3000 });
+    }
+}
 </script>
 
 <template>
@@ -122,22 +120,30 @@ generateQRCode();
                     </select>
                 </div>
                 <div class="mb-4">
-                    <label class="block text-sm font-medium text-gray-700 dark:text-gray-300">Tipo de Conexión</label>
-                    <select v-model="profile.connectionType" @change="generateQRCode" class="mt-1 p-2 w-full border rounded-md shadow-sm focus:ring-blue-500 focus:border-blue-500 dark:bg-surface-600 dark:border-surface-600 dark:text-white">
-                        <option value="normal">Normal</option>
-                        <option value="admin">Admin</option>
-                    </select>
-                </div>
-                <div class="mb-4">
                     <button @click="saveProfile" class="w-full bg-blue-500 hover:bg-blue-600 text-white p-3 rounded-md shadow-sm focus:ring-blue-500 focus:border-blue-500 dark:bg-blue-700 dark:hover:bg-blue-800">Guardar</button>
                 </div>
-                <div class="mb-4">
-                    <button @click="signOut" as="router-link" to="/" class="w-full bg-red-500 hover:bg-red-600 text-white p-3 rounded-md shadow-sm focus:ring-red-500 focus:border-red-500 dark:bg-red-700 dark:hover:bg-red-800">Cerrar Sesión</button>
+            </div>
+            <div class="col-span-1 md:col-span-2 flex flex-col items-center mt-6">
+                <button @click="() => generateConnectionCode('admin')" class="w-full md:w-1/2 bg-green-500 hover:bg-green-600 text-white p-3 rounded-md shadow-sm">Generar Código Admin</button>
+                <button @click="() => generateConnectionCode('normal')" class="w-full md:w-1/2 bg-blue-500 hover:bg-blue-600 text-white p-3 rounded-md shadow-sm mt-2">Generar Código Normal</button>
+                <div v-if="profile.connectionCode" class="mt-4 p-3 border rounded-md bg-gray-100 dark:bg-gray-700">
+                    Código de conexión ({{ profile.connectionType }}): <strong>{{ profile.connectionCode }}</strong>
                 </div>
             </div>
-        </div>
-        <div class="mt-8 flex justify-center">
-            <img :src="qrCodeUrl" alt="Código QR" class="w-32 h-32" />
+
+            <div class="col-span-1 md:col-span-2 flex flex-col items-center mt-6">
+                <h3 class="text-xl font-bold mb-4">Conectar con otra persona</h3>
+                <input
+                    type="text"
+                    v-model="profile.connectionCodeInput"
+                    placeholder="Introduce el código de conexión"
+                    class="mt-1 p-2 w-full border rounded-md shadow-sm focus:ring-blue-500 focus:border-blue-500 dark:bg-surface-700 dark:border-surface-600 dark:text-white"
+                />
+                <button @click="connectWithCode" class="w-full bg-blue-500 hover:bg-blue-600 text-white p-3 rounded-md shadow-sm mt-2">Conectar</button>
+            </div>
+            <div class="col-span-1 md:col-span-2 flex justify-center mt-6">
+                <button @click="signOut" class="w-full md:w-1/2 bg-red-500 hover:bg-red-600 text-white p-3 rounded-md shadow-sm focus:ring-red-500 focus:border-red-500 dark:bg-red-700 dark:hover:bg-red-800">Cerrar Sesión</button>
+            </div>
         </div>
     </div>
 </template>

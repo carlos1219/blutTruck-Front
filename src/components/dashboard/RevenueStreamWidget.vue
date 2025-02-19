@@ -1,5 +1,5 @@
 <script setup>
-import { onMounted, ref } from 'vue';
+import { onMounted, ref, watch } from 'vue';
 
 const charts = ref([
     {
@@ -11,14 +11,14 @@ const charts = ref([
                 label: 'Sistólica',
                 backgroundColor: '#FF6384',
                 data: [120, 118, 115, 113, 110, 108, 120, 125, 130, 135, 140, 138, 137, 135, 132, 130, 128, 126, 125, 124, 122, 121, 120, 119],
-                barThickness: 16
+                barThickness: 12
             },
             {
                 type: 'bar',
                 label: 'Diastólica',
                 backgroundColor: '#36A2EB',
                 data: [80, 78, 76, 75, 73, 72, 78, 80, 82, 85, 87, 86, 85, 83, 82, 80, 79, 78, 77, 76, 75, 74, 73, 72],
-                barThickness: 16
+                barThickness: 12
             }
         ]
     },
@@ -97,15 +97,26 @@ onMounted(() => {
     chartData.value = charts.value[currentChartIndex.value];
     chartOptions.value = setChartOptions();
 });
+watch(currentChartIndex, () => {
+    chartOptions.value = setChartOptions();
+});
 </script>
-
 <template>
-    <div class="card flex items-center">
+    <div class="card flex flex-col sm:flex-row items-center">
         <button @click="prevChart" class="p-2 mr-4 bg-gray-200 rounded">⬅️</button>
-        <div class="flex-1">
-            <div class="font-semibold text-xl mb-4">{{ charts[currentChartIndex].title }}</div>
-            <Chart type="bar" :data="charts[currentChartIndex]" :options="chartOptions" class="h-80" />
+        <div class="flex-1 w-full">
+            <div class="font-semibold text-xl mb-4 text-center">{{ charts[currentChartIndex].title }}</div>
+            <div class="relative w-full h-80">
+                <Chart type="bar" :data="charts[currentChartIndex]" :options="chartOptions" class="w-full h-full" />
+            </div>
         </div>
         <button @click="nextChart" class="p-2 ml-4 bg-gray-200 rounded">➡️</button>
     </div>
 </template>
+
+<style scoped>
+.card {
+    max-width: 100%;
+    overflow: hidden;
+}
+</style>
