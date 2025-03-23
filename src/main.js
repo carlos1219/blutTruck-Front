@@ -12,9 +12,14 @@ import Tooltip from 'primevue/tooltip'; // Importa Tooltip
 import '@/assets/styles.scss';
 import '@/assets/tailwind.css';
 
+// Importa y crea la instancia de Pinia
+import { createPinia } from 'pinia';
+const pinia = createPinia();
+
 const app = createApp(App);
 
 app.use(router);
+app.use(pinia); // Agrega Pinia
 app.use(PrimeVue, {
     theme: {
         preset: Aura,

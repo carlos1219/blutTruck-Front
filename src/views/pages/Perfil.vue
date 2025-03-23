@@ -59,27 +59,24 @@ function connectWithCode() {
                 <div class="mb-6">
                     <img :src="profile.imageUrl" alt="Foto de perfil" class="w-32 h-32 rounded-full object-cover" />
                 </div>
-                <div class="mb-4">
-                    <label class="block text-sm font-medium text-gray-700 dark:text-gray-300">Fumador</label>
+                <div class="mb-4 flex items-center">
                     <input type="checkbox" v-model="profile.smoke" class="mt-1 p-2 border rounded-md shadow-sm focus:ring-blue-500 focus:border-blue-500 dark:bg-surface-700 dark:border-surface-600 dark:text-white" readonly />
-                </div>
-                <div class="mb-4">
-                    <label class="block text-sm font-medium text-gray-700 dark:text-gray-300">Bebe Alcohol</label>
-                    <input type="checkbox" v-model="profile.alcohol" class="mt-1 p-2 border rounded-md shadow-sm focus:ring-blue-500 focus:border-blue-500 dark:bg-surface-700 dark:border-surface-600 dark:text-white" readonly />
-                </div>
-                <div class="mb-4">
-                    <label class="block text-sm font-medium text-gray-700 dark:text-gray-300">Predisposición</label>
-                    <input type="checkbox" v-model="profile.hasPredisposition" class="mt-1 p-2 border rounded-md shadow-sm focus:ring-blue-500 focus:border-blue-500 dark:bg-surface-700 dark:border-surface-600 dark:text-white" readonly />
+                    <label class="ml-2 text-sm font-medium text-gray-700 dark:text-gray-300">Fumador</label>
                 </div>
                 <div class="mb-4 flex items-center">
-                    <div class="w-40">
-                        <label class="block text-sm font-medium text-gray-700 dark:text-gray-300">Nivel de Colesterol</label>
-                    </div>
-                    <div class="flex-1 ml-4">
-                        <Slider v-model="profile.cholesterol" :min="0" :max="5" :step="1" class="w-full my-slider" />
-                        <div class="text-xs text-gray-600 mt-1">{{ profile.cholesterol * 20 }} mg/dL</div>
-                    </div>
+                    <input type="checkbox" v-model="profile.alcohol" class="mt-1 p-2 border rounded-md shadow-sm focus:ring-blue-500 focus:border-blue-500 dark:bg-surface-700 dark:border-surface-600 dark:text-white" readonly />
+                    <label class="ml-2 text-sm font-medium text-gray-700 dark:text-gray-300">Bebe Alcohol</label>
                 </div>
+                <div class="mb-4 flex items-center">
+                    <input type="checkbox" v-model="profile.hasPredisposition" class="mt-1 p-2 border rounded-md shadow-sm focus:ring-blue-500 focus:border-blue-500 dark:bg-surface-700 dark:border-surface-600 dark:text-white" readonly />
+                    <label class="ml-2 text-sm font-medium text-gray-700 dark:text-gray-300">Predisposición</label>
+                </div>
+                <div class="mb-4 w-full">
+                    <label class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">Nivel de Colesterol</label>
+                    <Slider v-model="profile.cholesterol" :min="0" :max="5" :step="1" class="w-full my-slider" />
+                    <div class="text-xs text-gray-600 mt-1">{{ profile.cholesterol * 20 }} mg/dL</div>
+                </div>
+
                 <div class="mb-4 relative">
                     <label class="block text-sm font-medium text-gray-700 dark:text-gray-300">Porcentaje de Alerta</label>
                     <input
@@ -124,8 +121,10 @@ function connectWithCode() {
                 </div>
             </div>
             <div class="col-span-1 md:col-span-2 flex flex-col items-center mt-6">
-                <button @click="() => generateConnectionCode('admin')" class="w-full md:w-1/2 bg-green-500 hover:bg-green-600 text-white p-3 rounded-md shadow-sm">Generar Código Admin</button>
-                <button @click="() => generateConnectionCode('normal')" class="w-full md:w-1/2 bg-blue-500 hover:bg-blue-600 text-white p-3 rounded-md shadow-sm mt-2">Generar Código Normal</button>
+                <div class="col-span-1 md:col-span-2 flex justify-center mt-6 space-x-4">
+                    <button @click="() => generateConnectionCode('admin')" class="bg-green-500 hover:bg-green-600 text-white p-3 rounded-md shadow-sm">Generar Código Admin</button>
+                    <button @click="() => generateConnectionCode('normal')" class="bg-blue-500 hover:bg-blue-600 text-white p-3 rounded-md shadow-sm">Generar Código Normal</button>
+                </div>
                 <div v-if="profile.connectionCode" class="mt-4 p-3 border rounded-md bg-gray-100 dark:bg-gray-700">
                     Código de conexión ({{ profile.connectionType }}): <strong>{{ profile.connectionCode }}</strong>
                 </div>
@@ -141,8 +140,10 @@ function connectWithCode() {
                 />
                 <button @click="connectWithCode" class="w-full bg-blue-500 hover:bg-blue-600 text-white p-3 rounded-md shadow-sm mt-2">Conectar</button>
             </div>
-            <div class="col-span-1 md:col-span-2 flex justify-center mt-6">
-                <button @click="signOut" class="w-full md:w-1/2 bg-red-500 hover:bg-red-600 text-white p-3 rounded-md shadow-sm focus:ring-red-500 focus:border-red-500 dark:bg-red-700 dark:hover:bg-red-800">Cerrar Sesión</button>
+            <div class="col-span-1 md:col-span-2 flex justify-center mt-4 space-x-4">
+                <button @click="getAllData" class="bg-purple-500 hover:bg-purple-100 text-white p-3 rounded-md shadow-sm focus:ring-purple-500 focus:border-purple-100 dark:bg-purple-900 dark:hover:bg-purple-950">Obtener Todos los Datos</button>
+                <button @click="signOut" class="bg-red-500 hover:bg-red-600 text-white p-3 rounded-md shadow-sm focus:ring-red-500 focus:border-red-500 dark:bg-red-700 dark:hover:bg-red-800">Cerrar Sesión</button>
+                <button @click="deleteAllData" class="bg-orange-400 hover:bg-orange-600 text-white p-3 rounded-md shadow-sm focus:ring-orange-500 focus:border-orange-500 dark:bg-orange-700 dark:hover:bg-orange-800">Eliminar Todos los Datos</button>
             </div>
         </div>
     </div>
