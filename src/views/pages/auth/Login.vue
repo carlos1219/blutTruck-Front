@@ -32,7 +32,7 @@ const loginUser = async () => {
             Email: email.value,
             Password: password.value
         });
-        const token = loginResponse.data.token;
+        const token = 'string';
         const userId = loginResponse.data.userId;
 
         localStorage.setItem('token', token);
@@ -98,7 +98,7 @@ const loginUser = async () => {
                             </div>
                             <span class="font-medium no-underline ml-2 text-right cursor-pointer text-blue-500"> ¿Has olvidado la contraseña? </span>
                         </div>
-                        <Button label="Sign In" class="w-full !bg-blue-500" @click="loginUser"></Button>
+                        <Button label="Sign In" class="w-full !bg-blue-500 !border-blue-500" @click="loginUser"></Button>
                         <div v-if="errorMessage" class="mt-4 text-red-500">{{ errorMessage }}</div>
                     </div>
                 </div>

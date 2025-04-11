@@ -41,7 +41,7 @@ function smoothScroll(id) {
         <div class="flex border-t lg:border-t-0 border-surface py-4 lg:py-0 mt-4 lg:mt-0 gap-2">
             <Button label="Inicia Sesión" text as="router-link" to="/auth/login" rounded class="!text-blue-500"></Button>
 
-            <Button label="Registrate" as="router-link" to="/auth/register" rounded class="!bg-blue-500"></Button>
+            <Button label="Registrate" as="router-link" to="/auth/register" rounded class="!bg-blue-500 !border-blue-500"></Button>
         </div>
     </div>
 </template>

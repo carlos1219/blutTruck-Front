@@ -1,6 +1,9 @@
 <script setup>
 import FloatingConfigurator from '@/components/FloatingConfigurator.vue';
 import { ref } from 'vue';
+import { useRouter } from 'vue-router';
+
+const router = useRouter();
 
 const name = ref('');
 const email = ref('');
@@ -65,9 +68,9 @@ const registerUser = async () => {
             return;
         }
 
-        const data = await response.json();
-        message.value = { type: 'success', text: `Registro exitoso. Token: ${data.Token}` };
-        // Aquí podrías redirigir al usuario o realizar alguna acción adicional
+        await response.json();
+        message.value = { type: 'success', text: 'Registro exitoso.' };
+        router.push('/auth/login');
     } catch (error) {
         console.error('Error en la petición:', error);
         message.value = { type: 'error', text: 'Ha ocurrido un error en el registro.' };
@@ -94,21 +97,20 @@ const registerUser = async () => {
 
                     <div>
                         <label for="name" class="block text-surface-900 dark:text-surface-0 text-xl font-medium mb-2">Nombre</label>
-                        <InputText id="name" type="text" placeholder="Nombre" class="w-full md:w-[30rem] mb-8" v-model="name" />
+                        <InputText id="name" type="text" placeholder="Nombre" class="w-full md:w-[30rem] mb-8 focus:!border-blue-500" v-model="name" />
 
                         <label for="email1" class="block text-surface-900 dark:text-surface-0 text-xl font-medium mb-2">Correo electrónico</label>
-                        <InputText id="email1" type="text" placeholder="Correo electrónico" class="w-full md:w-[30rem] mb-8" v-model="email" />
+                        <InputText id="email1" type="text" placeholder="Correo electrónico" class="w-full md:w-[30rem] mb-8 focus:!border-blue-500" v-model="email" />
 
                         <label for="password1" class="block text-surface-900 dark:text-surface-0 font-medium text-xl mb-2">Contraseña</label>
-                        <Password id="password1" v-model="password" placeholder="Contraseña" :toggleMask="true" class="mb-4" fluid :feedback="false"></Password>
+                        <InputText id="password1" type="password" v-model="password" placeholder="Contraseña" class="mb-4 focus:!border-blue-500 w-full" />
 
                         <label for="confirmPassword" class="block text-surface-900 dark:text-surface-0 font-medium text-xl mb-2">Confirmar contraseña</label>
-                        <Password id="confirmPassword" v-model="confirmPassword" placeholder="Confirmar contraseña" :toggleMask="true" class="mb-4" fluid :feedback="false"></Password>
+                        <InputText id="confirmPassword" type="password" v-model="confirmPassword" placeholder="Contraseña" class="mb-4 focus:!border-blue-500 w-full" />
 
                         <div class="flex items-center justify-between mt-2 mb-8 gap-8">
                             <div class="flex items-center">
-                                <Checkbox v-model="checked" id="terms" binary class="mr-2"></Checkbox>
-                                <!-- Enlace al PDF en carpeta public -->
+                                <input v-model="checked" type="checkbox" id="terms" binary class="mr-2 focus:ring-blue-500 focus:border-blue-500" />
                                 <label for="terms">
                                     Acepto los
                                     <a href="/Privacidad.pdf" target="_blank" class="text-blue-500 underline"> términos y condiciones </a>
@@ -116,7 +118,7 @@ const registerUser = async () => {
                             </div>
                         </div>
                         <!-- Se llama a la función registerUser al hacer click -->
-                        <Button label="Registrarse" class="w-full !bg-blue-500" @click="registerUser"></Button>
+                        <Button label="Registrarse" class="w-full !bg-blue-500 !border-blue-500" @click="registerUser"></Button>
                     </div>
                 </div>
             </div>

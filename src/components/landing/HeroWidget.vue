@@ -7,7 +7,7 @@
                 Pruebela gratis ahora
             </h1>
             <div class="flex justify-center mt-8">
-                <Button label="Empieza Ahora" as="router-link" to="/auth/login" rounded class="!text-xl !px-6 !py-3 !bg-blue-500 text-white mb-6"></Button>
+                <Button label="Empieza Ahora" as="router-link" to="/auth/login" rounded class="!text-xl !px-6 !py-3 !bg-blue-500 text-white mb-6 !border-blue-500"></Button>
             </div>
         </div>
         <div class="flex justify-center mt-8">

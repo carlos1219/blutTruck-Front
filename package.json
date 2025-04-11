@@ -10,7 +10,9 @@
     "dependencies": {
         "@primevue/themes": "^4.2.4",
         "axios": "^1.8.3",
+        "big-integer": "^1.6.52",
         "chart.js": "3.3.2",
+        "crypto-js": "^4.2.0",
         "flatpickr": "^4.6.13",
         "pinia": "^3.0.1",
         "primeicons": "^7.0.0",

@@ -32,5 +32,4 @@ app.use(ToastService);
 app.use(ConfirmationService);
 
 app.directive('tooltip', Tooltip); // Registra la directiva tooltip
-
 app.mount('#app');
