@@ -4,7 +4,8 @@ import { defineStore } from 'pinia';
 export const useUserStore = defineStore('user', {
     state: () => ({
         fullUserData: null,
-        dias: {}
+        dias: {},
+        monitoredUserData: null
     }),
     actions: {
         setUserData(data) {
@@ -12,6 +13,9 @@ export const useUserStore = defineStore('user', {
         },
         setDias(diasData) {
             this.dias = diasData;
+        },
+        setMonitoredUserData(data) {
+            this.monitoredUserData = data;
         },
         updateDiasInUserData(newDias) {
             if (this.fullUserData) {

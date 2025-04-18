@@ -5,8 +5,8 @@ import AppMenuItem from './AppMenuItem.vue';
 
 const model = ref([
     {
-        label: 'Home',
-        items: [{ label: 'Dashboard', icon: 'pi pi-fw pi-home !text-blue-500', to: '/dashboard' }]
+        label: 'Inicio',
+        items: [{ label: 'Mis Estadísticas', icon: 'pi pi-fw pi-home !text-blue-500', to: '/dashboard' }]
     },
     {
         label: 'Conexiones',
@@ -23,10 +23,10 @@ const model = ref([
         ]
     },
     {
-        label: 'Interactivo',
+        label: 'Aprende',
         items: [
             { label: 'Quiz', icon: 'pi pi-fw pi-star !text-blue-500', to: '/Quiz' },
-            { label: 'Aprende', icon: 'pi pi-fw pi-book !text-blue-500', to: '/Aprende' }
+            { label: 'Guía ', icon: 'pi pi-fw pi-book !text-blue-500', to: '/Aprende' }
         ]
     }
 ]);

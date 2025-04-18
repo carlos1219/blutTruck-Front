@@ -248,7 +248,7 @@ async function handleSubmit() {
             HealthData: healthDataForApi
         };
 
-        const apiUrl = 'http://localhost:3000/api/WriteData/write';
+        const apiUrl = 'http://localhost:3000/api/WriteData/writeWeb';
         const response = await axios.post(apiUrl, requestBodyForApi);
 
         if (response.status === 200) {

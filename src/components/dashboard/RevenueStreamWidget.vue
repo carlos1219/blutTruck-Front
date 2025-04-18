@@ -55,7 +55,7 @@ const heartRateData = computed(() => {
         const date = new Date(item.time);
         return date.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
     });
-    const rateData = hrData.map((item) => item.rate);
+    const rateData = hrData.map((item) => item.bpm);
     return { labels, rateData };
 });
 
@@ -69,11 +69,23 @@ const oxygenData = computed(() => {
     return { labels, percentageData };
 });
 
+const temperatureData = computed(() => {
+    // Asume que los datos llegan como 'temperatureData' en dailyData
+    // y cada item tiene 'time' y 'temperature'
+    const tempData = dailyData.value?.temperatureData ?? [];
+    const labels = tempData.map((item) => {
+        const date = new Date(item.time); // Asegúrate que 'item.time' sea un formato que Date pueda parsear
+        return date.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
+    });
+    const temperatureValues = tempData.map((item) => item.temperature); // Asegúrate que la propiedad sea 'temperature'
+    return { labels, temperatureValues };
+});
+
 const charts = computed(() => {
     const pressure = pressureData.value;
     const heart = heartRateData.value;
     const oxygen = oxygenData.value;
-
+    const temperature = temperatureData.value;
     return [
         {
             title: 'Presión Arterial Durante el Día',
@@ -117,6 +129,19 @@ const charts = computed(() => {
                     label: 'Oxigenación (%)',
                     backgroundColor: '#FFC107',
                     data: oxygen.percentageData,
+                    barThickness: 16
+                }
+            ]
+        },
+        {
+            title: 'Temperatura Corporal Durante el Día',
+            labels: temperature.labels,
+            datasets: [
+                {
+                    type: 'bar',
+                    label: 'Temperatura (°C)',
+                    backgroundColor: '#FF9800',
+                    data: temperature.temperatureValues,
                     barThickness: 16
                 }
             ]

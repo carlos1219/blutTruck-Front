@@ -2,17 +2,13 @@
 import axios from 'axios'; // Importa Axios
 import Calendar from 'primevue/calendar';
 import Slider from 'primevue/slider';
-import { useConfirm } from 'primevue/useconfirm'; // Importar el hook useConfirm
 import { useToast } from 'primevue/usetoast';
 import { onMounted, ref } from 'vue';
-import { useRouter } from 'vue-router';
 import { useUserStore } from '/stores/user';
 // Usar el hook para obtener el servicio de confirmación
-const confirm = useConfirm();
 
 // Acceder al store de Pinia
 const userStore = useUserStore();
-const router = useRouter();
 const profile = ref({
     name: '',
     weight: null,
@@ -25,6 +21,7 @@ const profile = ref({
     hasPredisposition: false,
     imageUrl: '/demo/images/monitoreo/hombre1.jpg', // URL de imagen de ejemplo por defecto
     connectionType: 'normal', // Tipo de conexión por defecto
+    notificationPercentage: 60, // Valor por defecto para el porcentaje de alerta
     connectionCode: null,
     connectionCodeInput: null
 });
@@ -36,8 +33,8 @@ const updateProfileFromStore = () => {
     // Define la imagen por defecto aquí para fácil acceso
     const defaultImageUrl = '/demo/images/monitoreo/hombre1.png';
 
-    if (userStore.fullUserData && userStore.fullUserData.datosPersonales) {
-        const datos = userStore.fullUserData.datosPersonales;
+    if (userStore.monitoredUserData && userStore.monitoredUserData.datosPersonales) {
+        const datos = userStore.monitoredUserData.datosPersonales;
         profile.value.name = datos.name || '';
         profile.value.weight = datos.weight || null;
         profile.value.height = datos.height || null;
@@ -78,7 +75,7 @@ function validateProfile() {
 
 onMounted(() => {
     updateProfileFromStore();
-    // Ejemplo: if (!userStore.fullUserData) { fetchUserData(); }
+    // Ejemplo: if (!userStore.monitoredUserData) { fetchUserData(); }
 });
 
 async function saveProfile() {
@@ -87,7 +84,7 @@ async function saveProfile() {
         return; // Se detiene el guardado si hay error en la validación
     }
 
-    const userId = userStore.fullUserData.userId;
+    const userId = userStore.monitoredUserData.monitoredUserId;
     const apiUrl = 'http://localhost:3000/api/WriteData/save-profile';
 
     const profileDataToSend = {
@@ -121,10 +118,10 @@ async function saveProfile() {
             console.log('Perfil guardado en el backend', response.data);
             // Supongamos que la respuesta incluye los datos actualizados del perfil:
             if (response.data && response.data.datosPersonales) {
-                userStore.fullUserData.datosPersonales = { ...response.data.datosPersonales };
+                userStore.monitoredUserData.datosPersonales = { ...response.data.datosPersonales };
             } else {
                 // Como alternativa, actualizamos el store con los valores locales:
-                userStore.fullUserData.datosPersonales = {
+                userStore.monitoredUserData.datosPersonales = {
                     name: profile.value.name,
                     weight: profile.value.weight,
                     height: profile.value.height,
@@ -156,231 +153,12 @@ async function saveProfile() {
     }
 }
 
-function signOut() {
-    userStore.$reset(); // Resetea el store del usuario
-    toast.add({ severity: 'warn', summary: 'Cerrar Sesión', detail: 'Sesión cerrada', life: 3000 });
-
-    // Redirige al usuario a la página principal
-    router.push('/');
-}
-
-// Función hash simple (djb2)
-function generateDeterministicCode(userId, type) {
-    // Combina el ID de usuario y el tipo
-    const input = `${userId}-${type}`;
-    let hash = 5381;
-    for (let i = 0; i < input.length; i++) {
-        hash = (hash << 5) + hash + input.charCodeAt(i); // hash * 33 + c
-    }
-    // Convierte el hash a un número positivo, luego a base36 y toma los primeros 8 caracteres
-    return Math.abs(hash).toString(36).toUpperCase().substr(0, 8);
-}
-
-function generateConnectionCode(type) {
-    profile.value.connectionType = type;
-    // Asume que el ID de usuario se obtiene del store
-    const userId = userStore.fullUserData.userId;
-    profile.value.connectionCode = generateDeterministicCode(userId, type);
-    registerConnectionCode(); // Llama a la función que registra el código en el backend
-    toast.add({
-        severity: 'info',
-        summary: 'Código Generado',
-        detail: `Código de conexión (${type}): ${profile.value.connectionCode}`,
-        life: 5000
-    });
-}
-
-function generateConnectionCodeAdmin(type) {
-    profile.value.connectionType = type;
-    // Asume que el ID de usuario se obtiene del store
-    const userId = userStore.fullUserData.userId;
-    profile.value.connectionCode = generateDeterministicCode(userId, type);
-    registerConnectionCodeAdmin(); // Llama a la función que registra el código en el backend
-    toast.add({
-        severity: 'info',
-        summary: 'Código Generado',
-        detail: `Código de conexión (${type}): ${profile.value.connectionCode}`,
-        life: 5000
-    });
-}
-
-async function getConnectionUserId() {
-    if (!profile.value.connectionCodeInput) {
-        toast.add({ severity: 'error', summary: 'Error', detail: 'Introduce un código válido', life: 3000 });
-        return null;
-    }
-
-    const apiUrl = 'http://localhost:3000/api/WriteData/GetCodeConnection'; // Ajusta la URL según tu API
-    const payload = {
-        Code: profile.value.connectionCodeInput,
-        IdToken: 'string' // Se usa "string" para que el backend genere el token si es necesario
-    };
-
-    try {
-        const response = await axios.post(apiUrl, payload);
-        // Se asume que la respuesta tiene la propiedad Result.id que contiene el userId
-        const userIdFromCode = response.data.result.id;
-        return userIdFromCode;
-    } catch (error) {
-        const errorMsg = error.response?.data?.Message || 'Error al obtener el código de conexión.';
-        toast.add({ severity: 'error', summary: 'Error', detail: errorMsg, life: 3000 });
-        return null;
-    }
-}
-
-async function connectWithCode() {
-    if (!profile.value.connectionCodeInput) {
-        toast.add({ severity: 'error', summary: 'Error', detail: 'Introduce un código válido', life: 3000 });
-        return;
-    }
-
-    // Obtener el ID del usuario conectado a través del código
-    const connectedUserId = await getConnectionUserId();
-    if (connectedUserId) {
-        const registered = await registerConnection(connectedUserId);
-        if (registered) {
-            toast.add({
-                severity: 'success',
-                summary: 'Conexión establecida',
-                life: 3000
-            });
-            // Luego eliminar el código de conexión
-            await deleteConnectionCode();
-        }
-    }
-}
-
-async function registerConnection(connectedUserId) {
-    const currentUserId = userStore.fullUserData.userId;
-    const apiUrl = 'http://localhost:3000/api/WriteData/registerConnection';
-    const payload = {
-        CurrentUserId: currentUserId,
-        ConnectedUserId: connectedUserId,
-        IdToken: 'string'
-    };
-
-    try {
-        const response = await axios.post(apiUrl, payload);
-        toast.add({ severity: 'success', summary: 'Conexión registrada', life: 3000 });
-        console.log('Conexión registrada:', response.data);
-        return true;
-    } catch (error) {
-        const errorMsg = error.response?.data?.Message || 'Error al registrar la conexión.';
-        toast.add({ severity: 'error', summary: 'Error', detail: errorMsg, life: 3000 });
-        console.error('Error en registerConnection:', error);
-        return false;
-    }
-}
-
-async function registerConnectionCode() {
-    if (!profile.value.connectionCode) {
-        toast.add({ severity: 'error', summary: 'Error', detail: 'No se ha generado ningún código de conexión.', life: 3000 });
-        return;
-    }
-
-    const apiUrl = 'http://localhost:3000/api/WriteData/registerCodeConnection';
-    const payload = {
-        CurrentUserId: userStore.fullUserData.userId,
-        Code: profile.value.connectionCode,
-        IdToken: 'string'
-    };
-
-    try {
-        await axios.post(apiUrl, payload);
-    } catch (error) {
-        const errorMsg = error.response?.data?.Message || 'Error al registrar el código de conexión.';
-        toast.add({ severity: 'error', summary: 'Error', detail: errorMsg, life: 3000 });
-    }
-    userStore.$reset();
-    updateProfileFromStore();
-}
-
-async function registerConnectionCodeAdmin() {
-    if (!profile.value.connectionCode) {
-        toast.add({ severity: 'error', summary: 'Error', detail: 'No se ha generado ningún código de conexión.', life: 3000 });
-        return;
-    }
-
-    const apiUrl = 'http://localhost:3000/api/WriteData/registerCodeConnection';
-    const payload = {
-        CurrentUserId: userStore.fullUserData.userId + ';admin:True',
-        Code: profile.value.connectionCode,
-        IdToken: 'string'
-    };
-
-    try {
-        const response = await axios.post(apiUrl, payload);
-        toast.add({ severity: 'success', summary: 'Éxito', detail: response.data.Message, life: 3000 });
-    } catch (error) {
-        const errorMsg = error.response?.data?.Message || 'Error al registrar el código de conexión.';
-        toast.add({ severity: 'error', summary: 'Error', detail: errorMsg, life: 3000 });
-    }
-    userStore.$reset();
-    updateProfileFromStore();
-}
-
-async function deleteConnectionCode(codeToDelete) {
-    // Usamos el código que se pasó como parámetro o, por defecto, el de profile.value.connectionCodeInput
-    const code = codeToDelete || profile.value.connectionCodeInput;
-    if (!code) {
-        toast.add({ severity: 'error', summary: 'Error', detail: 'No hay un código de conexión para eliminar.', life: 3000 });
-        return;
-    }
-
-    const apiUrl = 'http://localhost:3000/api/WriteData/deleteCodeConnection'; // Ajusta la URL según corresponda
-    const payload = {
-        Code: code,
-        IdToken: 'string'
-    };
-
-    try {
-        await axios.post(apiUrl, payload);
-        // Limpiamos el campo de entrada
-        profile.value.connectionCodeInput = null;
-    } catch (error) {
-        const errorMsg = error.response?.data?.Message || 'Error al eliminar el código de conexión.';
-        toast.add({ severity: 'error', summary: 'Error', detail: errorMsg, life: 3000 });
-    }
-}
-
-async function deleteAllData() {
-    confirm.require({
-        message: '¿Estás seguro de eliminar todos tus datos?',
-        header: 'Confirmar eliminación',
-        icon: 'pi pi-exclamation-triangle',
-        acceptLabel: 'Aceptar', // Texto en español para el botón de aceptar
-        rejectLabel: 'Cancelar', // Texto en español para el botón de rechazar
-        accept: async () => {
-            const apiUrl = 'http://localhost:3000/api/Writedata/deletedata';
-            const payload = {
-                UserId: userStore.fullUserData.userId,
-                Token: 'string'
-            };
-            try {
-                const response = await axios.delete(apiUrl, { data: payload });
-                if (response.status === 200 && response.data.success) {
-                    toast.add({ severity: 'success', summary: 'Éxito', detail: 'Datos eliminados correctamente', life: 3000 });
-                    userStore.$reset();
-                    updateProfileFromStore();
-                } else {
-                    toast.add({ severity: 'error', summary: 'Error', detail: response.data?.ErrorMessage || 'No se pudieron eliminar los datos', life: 3000 });
-                }
-            } catch (error) {
-                toast.add({ severity: 'error', summary: 'Error', detail: error.message || 'Error al eliminar los datos', life: 3000 });
-            }
-        },
-        reject: () => {
-            toast.add({ severity: 'info', summary: 'Cancelado', detail: 'Eliminación cancelada', life: 3000 });
-        }
-    });
-}
-
 async function downloadPdf() {
     // URL del endpoint, ajústala según la configuración de tu API
     const apiUrl = 'http://localhost:3000/api/ReadData/get-pdf';
     const payload = {
         Credentials: {
-            UserId: userStore.fullUserData.userId,
+            UserId: userStore.monitoredUserData.monitoredUserId,
             IdToken: 'string'
         }
     };
@@ -467,30 +245,9 @@ async function downloadPdf() {
                     <button @click="saveProfile" class="w-full bg-blue-500 hover:bg-blue-600 text-white p-3 rounded-md shadow-sm focus:ring-blue-500 focus:border-blue-500 dark:bg-blue-700 dark:hover:bg-blue-800">Guardar</button>
                 </div>
             </div>
-            <div class="col-span-1 md:col-span-2 flex flex-col items-center mt-6">
-                <div class="col-span-1 md:col-span-2 flex justify-center mt-6 space-x-4">
-                    <button @click="() => generateConnectionCodeAdmin('admin')" class="bg-green-500 hover:bg-green-600 text-white p-3 rounded-md shadow-sm">Generar Código Admin</button>
-                    <button @click="() => generateConnectionCode('normal')" class="bg-blue-500 hover:bg-blue-600 text-white p-3 rounded-md shadow-sm">Generar Código Normal</button>
-                </div>
-                <div v-if="profile.connectionCode" class="mt-4 p-3 border rounded-md bg-gray-100 dark:bg-gray-700">
-                    Código de conexión ({{ profile.connectionType }}): <strong>{{ profile.connectionCode }}</strong>
-                </div>
-            </div>
 
-            <div class="col-span-1 md:col-span-2 flex flex-col items-center mt-6">
-                <h3 class="text-xl font-bold mb-4">Conectar con otra persona</h3>
-                <input
-                    type="text"
-                    v-model="profile.connectionCodeInput"
-                    placeholder="Introduce el código de conexión"
-                    class="mt-1 p-2 w-full border rounded-md shadow-sm focus:ring-blue-500 focus:border-blue-500 dark:bg-surface-700 dark:border-surface-600 dark:text-white"
-                />
-                <button @click="connectWithCode" class="w-full bg-blue-500 hover:bg-blue-600 text-white p-3 rounded-md shadow-sm mt-2">Conectar</button>
-            </div>
             <div class="col-span-1 md:col-span-2 flex justify-center mt-4 space-x-4">
                 <button @click="downloadPdf" class="bg-purple-500 hover:bg-purple-100 text-white p-3 rounded-md shadow-sm focus:ring-purple-500 focus:border-purple-100 dark:bg-purple-900 dark:hover:bg-purple-950">Obtener Todos los Datos</button>
-                <button @click="signOut" class="bg-orange-400 hover:bg-orange-600 text-white p-3 rounded-md shadow-sm focus:ring-orange-500 focus:border-orange-500 dark:bg-orange-700 dark:hover:bg-orange-800">Cerrar Sesión</button>
-                <button @click="deleteAllData" class="bg-red-500 hover:bg-red-600 text-white p-3 rounded-md shadow-sm focus:ring-red-500 focus:border-red-500 dark:bg-red-700 dark:hover:bg-red-800">Eliminar Todos los Datos</button>
             </div>
         </div>
     </div>
