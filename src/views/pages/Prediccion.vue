@@ -93,7 +93,7 @@ export default {
             }
             this.isLoading = true;
             this.apiError = null;
-            const apiUrl = 'http://localhost:3000/api/ReadData/getprediction';
+            const apiUrl = 'http://192.168.1.152:3000/api/ReadData/getprediction';
             const payload = { UserId: this.userId, IdToken: 'string' };
             try {
                 const response = await axios.post(apiUrl, payload);
@@ -130,7 +130,7 @@ export default {
             this.isListLoading = true;
             this.listApiError = null;
             this.monitoredPeople = [];
-            const apiUrl = 'http://localhost:3000/api/ReadData/getlistprediction';
+            const apiUrl = 'http://192.168.1.152:3000/api/ReadData/getlistprediction';
             const payload = { UserId: this.userId, IdToken: 'string' };
             try {
                 console.log('Fetching monitored list for UserId:', this.userId);
@@ -185,7 +185,7 @@ export default {
             this.isPredictingManually = true;
             this.manualPredictionError = null;
             this.apiError = null;
-            const apiUrl = 'http://localhost:3000/api/Prediccion/PredictHealthRisk';
+            const apiUrl = 'http://192.168.1.152:3000/api/Prediccion/PredictHealthRisk';
             const payload = { UserId: this.userId };
             try {
                 const response = await axios.post(apiUrl, payload);

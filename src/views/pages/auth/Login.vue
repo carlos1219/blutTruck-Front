@@ -4,40 +4,59 @@ import { ref } from 'vue';
 import { useRouter } from 'vue-router';
 import { useUserStore } from '/stores/user.js';
 
+// --- Importa Firebase Auth y el proveedor de Google ---
+import { GoogleAuthProvider, signInWithPopup } from 'firebase/auth';
+// Asegúrate que la ruta a tu archivo firebase.js sea correcta
+import { auth } from '/src/firebase'; // <-- Verifica esta ruta
+
 const email = ref('');
 const password = ref('');
 const checked = ref(false);
 const errorMessage = ref('');
 const router = useRouter();
+const userStore = useUserStore();
 
-const baseUrl = 'http://localhost:3000';
+const baseUrl = 'http://192.168.1.152:3000';
 
-// Lógica para cargar las credenciales directamente en el bloque setup
+// Lógica para recordar email/pass (sin cambios)
 const storedEmail = localStorage.getItem('rememberMeEmail');
 const storedPassword = localStorage.getItem('rememberMePassword');
-
 if (storedEmail && storedPassword) {
     email.value = storedEmail;
     password.value = storedPassword;
     checked.value = true;
 }
 
+// --- Función LOGIN CON EMAIL/PASSWORD ---
+// Llama a tu backend que usa Firebase por debajo
 const loginUser = async () => {
     if (!email.value || !password.value) {
         errorMessage.value = 'Correo y contraseña son obligatorios.';
         return;
     }
+    errorMessage.value = '';
     try {
+        // 1. Llama a tu backend /login
         const loginResponse = await axios.post(`${baseUrl}/api/WriteData/login`, {
             Email: email.value,
             Password: password.value
         });
-        const token = 'string';
-        const userId = loginResponse.data.userId;
 
-        localStorage.setItem('token', token);
-        localStorage.setItem('userId', userId);
+        // 2. Extrae las credenciales de Firebase devueltas por TU backend
+        //    (Asumiendo que devuelve { userId: firebaseUid, token: firebaseIdToken, ... })
+        const backendResponseData = loginResponse.data;
+        const firebaseUid = backendResponseData.userId; // Este es el Firebase UID
+        const firebaseIdToken = backendResponseData.token; // Este es el Firebase ID Token
 
+        if (!firebaseUid || !firebaseIdToken) {
+            throw new Error('La respuesta del login no contiene userId o token.');
+        }
+
+        // 3. Guarda las credenciales de Firebase en localStorage
+        localStorage.setItem('userId', firebaseUid); // Guarda Firebase UID como 'userId'
+        localStorage.setItem('token', firebaseIdToken); // Guarda Firebase ID Token como 'token'
+
+        // 4. Gestiona 'Recuérdame' (sin cambios)
         if (checked.value) {
             localStorage.setItem('rememberMeEmail', email.value);
             localStorage.setItem('rememberMePassword', password.value);
@@ -49,37 +68,114 @@ const loginUser = async () => {
         const fullDataResponse = await axios.post(
             `${baseUrl}/api/ReadData/full`,
             {
-                UserId: userId,
-                IdToken: token
+                UserId: firebaseUid, // Envía Firebase UID
+                IdToken: 'string' // Envía Firebase ID Token
             },
             {
-                headers: { Authorization: `Bearer ${token}` }
+                headers: { Authorization: `Bearer ${firebaseIdToken}` } // Envía Firebase ID Token
             }
         );
+
+        // 6. Procesa respuesta, actualiza store y redirige
         localStorage.setItem('fullUserData', JSON.stringify(fullDataResponse.data));
-
-        const userStore = useUserStore();
-        userStore.setUserData({ userId, ...fullDataResponse.data });
-
+        userStore.setUserData({ userId: firebaseUid, ...fullDataResponse.data });
         router.push('/dashboard');
     } catch (error) {
-        if (error.response && error.response.data && error.response.data.Message) {
-            errorMessage.value = error.response.data.Message;
+        console.error('Error en loginUser:', error);
+        if (error.response) {
+            errorMessage.value = error.response.data?.Message || 'Error del servidor al iniciar sesión.';
+        } else if (error.message.includes('userId o token')) {
+            errorMessage.value = 'Error procesando la respuesta del login.';
         } else {
-            errorMessage.value = 'Error al iniciar sesión.';
+            errorMessage.value = 'Error al iniciar sesión con email/contraseña.';
         }
+        // Limpia tokens/datos si falla
+        localStorage.removeItem('token');
+        localStorage.removeItem('userId');
+        localStorage.removeItem('fullUserData');
     }
+};
+
+// --- Función LOGIN CON GOOGLE usando FIREBASE ---
+const signInWithGoogleFirebase = async () => {
+    const provider = new GoogleAuthProvider();
+    errorMessage.value = ''; // Limpia errores
+
+    try {
+        // 1. Abre el Popup de Google Sign-In gestionado por Firebase JS SDK
+        const result = await signInWithPopup(auth, provider);
+        const user = result.user; // Usuario de Firebase
+
+        // 2. Obtén las credenciales de Firebase directamente
+        const firebaseUid = user.uid; // Firebase UID
+        const firebaseIdToken = await user.getIdToken(); // Firebase ID Token
+
+        console.log('Login con Google exitoso. Firebase UID:', firebaseUid);
+
+        // 3. Guarda las credenciales de Firebase en localStorage
+        localStorage.setItem('userId', firebaseUid); // Guarda Firebase UID como 'userId'
+        localStorage.setItem('token', firebaseIdToken); // Guarda Firebase ID Token como 'token'
+
+        // 4. Limpia otros datos de sesión si existieran
+        localStorage.removeItem('rememberMeEmail');
+        localStorage.removeItem('rememberMePassword');
+
+        // 5. *** LLAMA A /api/ReadData/full USANDO LAS CREDENCIALES DE FIREBASE ***
+        //     (Exactamente igual que en la función loginUser)
+        console.log(`Llamando a /api/ReadData/full para userId: ${firebaseUid}`);
+        const fullDataResponse = await axios.post(
+            `${baseUrl}/api/ReadData/full`,
+            {
+                UserId: firebaseUid, // Envía Firebase UID
+                IdToken: 'string' // Envía Firebase ID Token
+            },
+            {
+                headers: { Authorization: `Bearer ${firebaseIdToken}` } // Envía Firebase ID Token
+            }
+        );
+
+        // 6. Procesa respuesta, actualiza store y redirige
+        localStorage.setItem('fullUserData', JSON.stringify(fullDataResponse.data));
+        userStore.setUserData({ userId: firebaseUid, ...fullDataResponse.data });
+        router.push('/dashboard');
+    } catch (error) {
+        console.error('Error en Google Sign-In:', error);
+        if (error.response) {
+            // Error de Axios (probablemente de ReadData/full)
+            errorMessage.value = `Error del servidor: ${error.response.data?.Message || 'Operación fallida'}`;
+        } else if (error.code) {
+            // Error específico de Firebase (ej: popup cerrado)
+            errorMessage.value = `Error de Firebase: ${error.code}`;
+        } else {
+            // Otro error
+            errorMessage.value = 'Error al iniciar sesión con Google.';
+        }
+        // Limpia tokens/datos si falla
+        localStorage.removeItem('token');
+        localStorage.removeItem('userId');
+        localStorage.removeItem('fullUserData');
+    }
+};
+const goToLandingPage = () => {
+    router.push('/'); // Navega a la ruta raíz
 };
 </script>
 
 <template>
     <FloatingConfigurator />
-    <div class="bg-surface-50 dark:bg-surface-950 flex items-center justify-center min-h-screen min-w-[100vw] overflow-hidden">
+    <div class="bg-surface-50 dark:bg-surface-950 flex items-center justify-center min-h-screen min-w-[100vw] overflow-hidden relative p-4 sm:p-8">
+        <Button
+            icon="pi pi-arrow-left"
+            class="!absolute top-4 left-4 sm:top-8 sm:left-8 p-button-rounded p-button-text !text-surface-700 !dark:text-surface-200 !hover:bg-surface-100 !dark:hover:bg-surface-800"
+            @click="goToLandingPage"
+            aria-label="Volver a la página de inicio"
+        />
+
         <div class="flex flex-col items-center justify-center">
             <div style="border-radius: 56px; padding: 0.3rem; background: linear-gradient(180deg, #3498db 10%, rgba(33, 150, 243, 0) 30%)">
                 <div class="w-full bg-surface-0 dark:bg-surface-900 py-20 px-8 sm:px-20 !border-blue-500" style="border-radius: 53px">
                     <div class="text-center mb-8">
-                        <img src="/demo/images/logo.png" class="h-24 mx-auto" />
+                        <img src="/demo/images/logo.png" alt="Logo BlutTruck" class="h-24 mx-auto" />
                         <div class="text-surface-900 dark:text-surface-0 text-3xl font-medium mb-4">¡Bienvenido a BlutTruck!</div>
                         <span class="text-muted-color font-medium">Inicia sesión para continuar</span>
                     </div>
@@ -89,7 +185,7 @@ const loginUser = async () => {
                         <InputText id="email1" type="text" placeholder="Correo electrónico" class="w-full md:w-[30rem] mb-8 focus:!border-blue-500" v-model="email" />
 
                         <label for="password1" class="block text-surface-900 dark:text-surface-0 font-medium text-xl mb-2"> Contraseña </label>
-                        <InputText id="password1" type="password" v-model="password" placeholder="Contraseña" class="mb-4 focus:!border-blue-500 w-full" />
+                        <InputText id="password1" type="password" v-model="password" placeholder="Contraseña" class="mb-4 focus:!border-blue-500 w-full" @keyup.enter="loginUser" />
 
                         <div class="flex items-center justify-between mt-2 mb-8 gap-8">
                             <div class="flex items-center">
@@ -98,8 +194,14 @@ const loginUser = async () => {
                             </div>
                             <span class="font-medium no-underline ml-2 text-right cursor-pointer text-blue-500"> ¿Has olvidado la contraseña? </span>
                         </div>
-                        <Button label="Sign In" class="w-full !bg-blue-500 !border-blue-500" @click="loginUser"></Button>
-                        <div v-if="errorMessage" class="mt-4 text-red-500">{{ errorMessage }}</div>
+
+                        <Button label="Iniciar sesión" class="w-full !bg-blue-500 !border-blue-500 mb-4" @click="loginUser"></Button>
+
+                        <div class="text-center my-4 text-muted-color font-medium">O</div>
+
+                        <Button label="Iniciar sesión con Google" icon="pi pi-google" class="!border-blue-500 !text-blue-500 w-full p-button-outlined mb-4" @click="signInWithGoogleFirebase"></Button>
+
+                        <div v-if="errorMessage" class="mt-4 text-red-500 text-center">{{ errorMessage }}</div>
                     </div>
                 </div>
             </div>
@@ -108,13 +210,17 @@ const loginUser = async () => {
 </template>
 
 <style scoped>
-.pi-eye {
-    transform: scale(1.6);
-    margin-right: 1rem;
-}
-
+/* Estilos existentes (sin cambios) */
+.pi-eye,
 .pi-eye-slash {
     transform: scale(1.6);
     margin-right: 1rem;
+}
+.pi-google {
+    margin-right: 0.5rem;
+}
+
+.pi-arrow-left {
+    font-size: 2.5rem;
 }
 </style>

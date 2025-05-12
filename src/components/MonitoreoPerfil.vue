@@ -85,7 +85,7 @@ async function saveProfile() {
     }
 
     const userId = userStore.monitoredUserData.monitoredUserId;
-    const apiUrl = 'http://localhost:3000/api/WriteData/save-profile';
+    const apiUrl = 'http://192.168.1.152:3000/api/WriteData/save-profile';
 
     const profileDataToSend = {
         Credentials: {
@@ -155,7 +155,7 @@ async function saveProfile() {
 
 async function downloadPdf() {
     // URL del endpoint, ajústala según la configuración de tu API
-    const apiUrl = 'http://localhost:3000/api/ReadData/get-pdf';
+    const apiUrl = 'http://192.168.1.152:3000/api/ReadData/get-pdf';
     const payload = {
         Credentials: {
             UserId: userStore.monitoredUserData.monitoredUserId,

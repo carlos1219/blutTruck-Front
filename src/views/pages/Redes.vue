@@ -13,8 +13,8 @@ import { useConfirm } from 'primevue/useconfirm';
 import { useToast } from 'primevue/usetoast';
 
 const DEFAULT_AVATAR_URL = '/demo/images/monitoreo/hombre1.png';
-const API_BASE_URL_READ = 'http://localhost:3000/api/ReadData';
-const API_BASE_URL_WRITE = 'http://localhost:3000/api/WriteData';
+const API_BASE_URL_READ = 'http://192.168.1.152:3000/api/ReadData';
+const API_BASE_URL_WRITE = 'http://192.168.1.152:3000/api/WriteData';
 
 export default {
     name: 'MonitorScreen',
@@ -127,10 +127,10 @@ export default {
             // --- Construir el payload con la estructura del DTO C# ---
             const payload = {
                 Credentials: {
-                    UserId: currentUserUserId, // ID del usuario MONITOR (el que hace la petición)
+                    UserId: monitoredUserId, // ID del usuario MONITOR (el que hace la petición)
                     IdToken: idToken // Token del usuario MONITOR
                 },
-                UserMonitoringID: monitoredUserId // ID del usuario MONITOREADO (aquel cuyos datos se quieren ver)
+                UserMonitoringID: currentUserUserId // ID del usuario MONITOREADO (aquel cuyos datos se quieren ver)
             };
 
             // Opcional: Log para verificar la estructura antes de enviar
