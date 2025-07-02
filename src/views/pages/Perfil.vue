@@ -117,73 +117,77 @@ function validateProfile() {
 }
 
 async function saveProfile() {
+    // Primero validamos los datos
     if (!validateProfile()) {
-        return;
+        return; // Se detiene el guardado si hay error en la validación
     }
 
-    const userId = userStore.fullUserData?.userId;
-    if (!userId) {
-        toast.add({ severity: 'error', summary: 'Error', detail: 'No se pudo obtener el ID de usuario.', life: 3000 });
-        return;
-    }
-    // Asegúrate que esta URL es correcta y que el backend espera este formato.
-    const apiUrl = 'http://192.168.1.152:3000/api/WriteData/save-profile';
+    const userId = userStore.fullUserData.userId;
+    const apiUrl = 'https://bluttruck.grial.eu/backend/api/WriteData/save-profile';
 
     const profileDataToSend = {
         Credentials: {
             UserId: userId,
-            IdToken: 'string' // El backend debería manejar la obtención/validación del token si es 'string'
+            IdToken: 'string'
         },
         profile: {
-            // Asegúrate que el backend espera un objeto 'profile' con estos campos
-            Conexion: { ConnectionStatus: 0 }, // O el estado actual si lo tienes
-            DateOfBirth: profile.value.dateOfBirth ? profile.value.dateOfBirth.toISOString().split('T')[0] : null, // Formato YYYY-MM-DD
+            Conexion: {
+                ConnectionStatus: 0
+            },
+            DateOfBirth: profile.value.dateOfBirth,
             HasPredisposition: profile.value.hasPredisposition,
-            Height: profile.value.height ? parseInt(profile.value.height) : null,
-            Weight: profile.value.weight ? parseInt(profile.value.weight) : null,
+            Height: parseInt(profile.value.height) || null,
+            Weight: parseInt(profile.value.weight) || null,
             Gender: profile.value.gender === 'Hombre' ? 1 : profile.value.gender === 'Mujer' ? 2 : profile.value.gender === 'Otro' ? 3 : null,
             Smoke: profile.value.smoke ? 1 : 0,
             Alcohol: profile.value.alcohol ? 1 : 0,
-            Choresterol: profile.value.cholesterol, // Asegúrate que el backend espera 'Choresterol'
-            PhotoURL: profile.value.imageUrl, // Envía la URL actual
-            Name: profile.value.name,
-            Active: true // O el estado de actividad que corresponda
+            Choresterol: profile.value.cholesterol,
+            photoURL: userStore.fullUserData.datosPersonales.photoURL || null,
+            Name: profile.value.name || null,
+            Active: true
         }
     };
 
     try {
         const response = await axios.post(apiUrl, profileDataToSend);
-        if (response.status === 200 && response.data) {
-            // Verifica también response.data
-            toast.add({ severity: 'success', summary: 'Éxito', detail: 'Perfil guardado correctamente.', life: 3000 });
-            // Actualiza el store de Pinia con los datos guardados si el backend los devuelve
-            if (response.data.datosPersonales) {
-                // Asumiendo que el backend devuelve los datos actualizados
-                userStore.fullUserData.datosPersonales = { ...userStore.fullUserData.datosPersonales, ...response.data.datosPersonales };
+
+        if (response.status === 200) {
+            toast.add({ severity: 'success', summary: 'Éxito', detail: 'Perfil guardado correctamente', life: 3000 });
+            console.log('Perfil guardado en el backend', response.data);
+            // Supongamos que la respuesta incluye los datos actualizados del perfil:
+            if (response.data && response.data.datosPersonales) {
+                userStore.fullUserData.datosPersonales = { ...response.data.datosPersonales };
             } else {
-                // O actualiza con los datos locales si el backend no los devuelve
-                userStore.updatePersonalData({
-                    // Suponiendo que tienes una acción en tu store
+                // Como alternativa, actualizamos el store con los valores locales:
+                userStore.fullUserData.datosPersonales = {
                     name: profile.value.name,
                     weight: profile.value.weight,
                     height: profile.value.height,
-                    dateOfBirth: profile.value.dateOfBirth ? profile.value.dateOfBirth.toISOString().split('T')[0] : null,
+                    dateOfBirth: profile.value.dateOfBirth,
                     gender: profile.value.gender === 'Hombre' ? 1 : profile.value.gender === 'Mujer' ? 2 : profile.value.gender === 'Otro' ? 3 : null,
                     smoke: profile.value.smoke,
                     alcohol: profile.value.alcohol,
-                    choresterol: profile.value.cholesterol, // o cholesterol
+                    choresterol: profile.value.cholesterol,
                     hasPredisposition: profile.value.hasPredisposition,
-                    photoURL: profile.value.imageUrl
-                });
+                    photoURL: userStore.fullUserData.datosPersonales.photoURL
+                };
             }
-            updateProfileFromStore(); // Re-sincroniza el componente con el store
         } else {
-            toast.add({ severity: 'error', summary: 'Error', detail: `Error al guardar: ${response.data?.Message || response.statusText || 'Error desconocido'}`, life: 3000 });
+            toast.add({ severity: 'error', summary: 'Error', detail: `Error al guardar el perfil: ${response.data?.message || 'Error desconocido'}`, life: 3000 });
+            console.error('Error al guardar el perfil:', response.status, response.data);
         }
     } catch (error) {
-        const errorMsg = error.response?.data?.Message || error.message || 'Error de red o del servidor.';
-        toast.add({ severity: 'error', summary: 'Error de Guardado', detail: errorMsg, life: 5000 });
-        console.error('Error al guardar el perfil:', error.response || error);
+        toast.add({ severity: 'error', summary: 'Error', detail: `Error al guardar el perfil: ${error.message || error}`, life: 3000 });
+        console.error('Error al guardar el perfil:', error);
+        if (error.response) {
+            console.error('Datos de la respuesta:', error.response.data);
+            console.error('Estado de la respuesta:', error.response.status);
+            console.error('Cabeceras de la respuesta:', error.response.headers);
+        } else if (error.request) {
+            console.error('Datos de la solicitud:', error.request);
+        } else {
+            console.error('Error al configurar la solicitud:', error.message);
+        }
     }
 }
 
@@ -241,7 +245,7 @@ async function getConnectionUserId() {
         toast.add({ severity: 'error', summary: 'Error', detail: 'Introduce un código de conexión válido.', life: 3000 });
         return null;
     }
-    const apiUrl = 'http://192.168.1.152:3000/api/WriteData/GetCodeConnection';
+    const apiUrl = 'https://bluttruck.grial.eu/backend/api/WriteData/GetCodeConnection';
     const payload = {
         Code: profile.value.connectionCodeInput,
         IdToken: 'string'
@@ -283,7 +287,7 @@ async function registerConnection(connectedUserId) {
         toast.add({ severity: 'error', summary: 'Error', detail: 'ID de usuario actual no disponible.', life: 3000 });
         return false;
     }
-    const apiUrl = 'http://192.168.1.152:3000/api/WriteData/registerConnection';
+    const apiUrl = 'https://bluttruck.grial.eu/backend/api/WriteData/registerConnection';
     const payload = { CurrentUserId: currentUserId, ConnectedUserId: connectedUserId, IdToken: 'string' };
     try {
         await axios.post(apiUrl, payload);
@@ -302,7 +306,7 @@ async function registerConnectionCode() {
         toast.add({ severity: 'error', summary: 'Error', detail: 'No se ha generado código o falta ID de usuario.', life: 3000 });
         return;
     }
-    const apiUrl = 'http://192.168.1.152:3000/api/WriteData/registerCodeConnection';
+    const apiUrl = 'https://bluttruck.grial.eu/backend/api/WriteData/registerCodeConnection';
     const payload = { CurrentUserId: userId, Code: profile.value.connectionCode, IdToken: 'string' };
     try {
         await axios.post(apiUrl, payload);
@@ -320,7 +324,7 @@ async function registerConnectionCodeAdmin() {
         toast.add({ severity: 'error', summary: 'Error', detail: 'No se ha generado código o falta ID de usuario.', life: 3000 });
         return;
     }
-    const apiUrl = 'http://192.168.1.152:3000/api/WriteData/registerCodeConnection';
+    const apiUrl = 'https://bluttruck.grial.eu/backend/api/WriteData/registerCodeConnection';
     const payload = { CurrentUserId: `${userId};admin:True`, Code: profile.value.connectionCode, IdToken: 'string' };
     try {
         const response = await axios.post(apiUrl, payload);
@@ -340,7 +344,7 @@ async function deleteConnectionCode(codeToDelete) {
         // toast.add({ severity: 'warn', summary: 'Aviso', detail: 'No hay código de conexión para eliminar.', life: 3000 });
         return;
     }
-    const apiUrl = 'http://192.168.1.152:3000/api/WriteData/deleteCodeConnection';
+    const apiUrl = 'https://bluttruck.grial.eu/backend/api/WriteData/deleteCodeConnection';
     const payload = { Code: code, IdToken: 'string' };
     try {
         await axios.post(apiUrl, payload);
@@ -370,8 +374,8 @@ async function deleteAllData() {
                 toast.add({ severity: 'error', summary: 'Error', detail: 'ID de usuario no disponible.', life: 3000 });
                 return;
             }
-            const apiUrl = 'http://192.168.1.152:3000/api/WriteData/deletedata'; // Corregido: WriteData
-            const payload = { UserId: userId, Token: 'string' }; // El backend espera 'Token', no 'IdToken' aquí
+            const apiUrl = 'https://bluttruck.grial.eu/backend/api/WriteData/deletedata';
+            const payload = { UserId: userId, Token: 'string' };
             try {
                 const response = await axios.delete(apiUrl, { data: payload });
                 if (response.status === 200 && (response.data?.success || response.data?.Message)) {
@@ -396,7 +400,7 @@ async function deleteAllData() {
 
 async function downloadPdf() {
     // URL del endpoint, ajústala según la configuración de tu API
-    const apiUrl = 'http://192.168.1.152:3000/api/ReadData/get-pdf';
+    const apiUrl = 'https://bluttruck.grial.eu/backend/api/ReadData/get-pdf';
     const payload = {
         Credentials: {
             UserId: userStore.fullUserData.userId,
@@ -430,7 +434,7 @@ async function downloadPdfBySelectedType(dataTypeValue, dataTypeLabel, fileNameP
     }
 
     // Endpoint del C# Artifact para PDF por tipo
-    const apiUrl = 'http://192.168.1.152:3000/api/ReadData/get-pdf-by-type';
+    const apiUrl = 'https://bluttruck.grial.eu/backend/api/ReadData/get-pdf-by-type';
     const payload = {
         Credentials: {
             UserId: userId,
@@ -491,7 +495,7 @@ async function deleteUserAccount() {
                 toast.add({ severity: 'error', summary: 'Error', detail: 'ID de usuario no disponible para eliminar la cuenta.', life: 3000 });
                 return;
             }
-            const apiUrl = 'http://192.168.1.152:3000/api/WriteData/deleteuser';
+            const apiUrl = 'https://bluttruck.grial.eu/backend/api/WriteData/deleteuser';
             const payload = { UserId: userId, Token: 'string' }; // El backend espera 'Token'
             try {
                 const response = await axios.delete(apiUrl, { data: payload });

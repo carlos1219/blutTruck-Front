@@ -13,8 +13,8 @@ import { useConfirm } from 'primevue/useconfirm';
 import { useToast } from 'primevue/usetoast';
 
 const DEFAULT_AVATAR_URL = '/demo/images/monitoreo/hombre1.png';
-const API_BASE_URL_READ = 'http://192.168.1.152:3000/api/ReadData';
-const API_BASE_URL_WRITE = 'http://192.168.1.152:3000/api/WriteData';
+const API_BASE_URL_READ = 'https://bluttruck.grial.eu/backend/api/ReadData';
+const API_BASE_URL_WRITE = 'https://bluttruck.grial.eu/backend/api/WriteData';
 
 export default {
     name: 'MonitorScreen',

@@ -86,37 +86,46 @@ export default {
             // Add more robust bounds checks if needed for static mode
         },
         async fetchPredictionData() {
-            // (Code is identical to previous correct version)
             if (!this.userId) {
                 this.apiError = 'No se pudo obtener el ID de usuario.';
                 return;
             }
             this.isLoading = true;
             this.apiError = null;
-            const apiUrl = 'http://192.168.1.152:3000/api/ReadData/getprediction';
-            const payload = { UserId: this.userId, IdToken: 'string' };
+            const apiUrl = 'https://bluttruck.grial.eu/backend/api/ReadData/getprediction';
+            const payload = { UserId: this.userId, IdToken: 'string' }; // IdToken debería ser real
+
             try {
                 const response = await axios.post(apiUrl, payload);
                 if (response.data && typeof response.data.resultado === 'string') {
                     const parsedPercentage = parseFloat(response.data.resultado);
                     if (!isNaN(parsedPercentage)) {
                         this.apiRiskPercentage = parsedPercentage;
-                        this.recommendations = response.data.alertas && Array.isArray(response.data.alertas) ? response.data.alertas : [];
+                        this.recommendations = response.data.alertas || [];
                     } else {
                         throw new Error(`Valor de predicción inicial inválido: "${response.data.resultado}".`);
                     }
-                } else if (response.data && response.data.resultado === null) {
-                    console.warn('Predicción inicial retornó null.');
-                    this.apiRiskPercentage = null;
-                    this.recommendations = response.data.alertas && Array.isArray(response.data.alertas) ? response.data.alertas : [];
                 } else {
-                    throw new Error('Respuesta inválida (predicción inicial).');
+                    // Esto maneja el caso de 200 OK con resultado nulo
+                    this.apiRiskPercentage = null;
+                    this.recommendations = response.data?.alertas || [];
                 }
             } catch (error) {
                 console.error('Error fetchPredictionData:', error);
-                this.apiError = `Error (predicción inicial): ${error.response?.data?.Message || error.message || 'Desconocido'}`;
-                this.apiRiskPercentage = null;
-                this.recommendations = [];
+
+                // ✅ ¡LÓGICA AÑADIDA!
+                // Si el error es un 404, trátalo como "no hay datos", no como un error.
+                if (error.response && error.response.status === 404) {
+                    console.warn('API devolvió 404: No hay datos de predicción existentes.');
+                    this.apiRiskPercentage = null; // No hay predicción
+                    this.recommendations = [];
+                    this.apiError = null; // Limpiamos el error porque no es un fallo técnico
+                } else {
+                    // Para cualquier otro error (500, error de red, etc.), sí mostramos el mensaje.
+                    this.apiError = `Error (predicción inicial): ${error.response?.data?.Message || error.message || 'Desconocido'}`;
+                    this.apiRiskPercentage = null;
+                    this.recommendations = [];
+                }
             } finally {
                 this.isLoading = false;
             }
@@ -130,7 +139,7 @@ export default {
             this.isListLoading = true;
             this.listApiError = null;
             this.monitoredPeople = [];
-            const apiUrl = 'http://192.168.1.152:3000/api/ReadData/getlistprediction';
+            const apiUrl = 'https://bluttruck.grial.eu/backend/api/ReadData/getlistprediction';
             const payload = { UserId: this.userId, IdToken: 'string' };
             try {
                 console.log('Fetching monitored list for UserId:', this.userId);
@@ -185,7 +194,7 @@ export default {
             this.isPredictingManually = true;
             this.manualPredictionError = null;
             this.apiError = null;
-            const apiUrl = 'http://192.168.1.152:3000/api/Prediccion/PredictHealthRisk';
+            const apiUrl = 'https://bluttruck.grial.eu/backend/api/Prediccion/PredictHealthRisk';
             const payload = { UserId: this.userId };
             try {
                 const response = await axios.post(apiUrl, payload);

@@ -19,7 +19,7 @@ const checked = ref(false);
 const message = ref(null); // Variable para mostrar notificaciones
 
 // URL base de la API (Ajustada para que coincida con tu backend)
-const baseUrl = 'http://192.168.1.152:3000'; // Asume que esta es tu base
+const baseUrl = 'https://bluttruck.grial.eu/backend'; // Asume que esta es tu base
 
 // Expresiones regulares (sin cambios)
 const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;

@@ -1,19 +1,28 @@
 <script setup>
+import axios from 'axios';
 import Button from 'primevue/button';
 import Calendar from 'primevue/calendar';
 import { computed, onMounted, ref, watch } from 'vue';
 import { useUserStore } from '/stores/user';
-const userStore = useUserStore();
 
+// --- STORE, ESTADO Y CONSTANTES DE API ---
+const userStore = useUserStore();
+const apiGetFavorites = 'https://bluttruck.grial.eu/backend/api/ReadData/getFavorites';
+const apiSetFavorites = 'https://bluttruck.grial.eu/backend/api/ReadData/setFavorites';
+
+// Estado local para el componente
 const selectedDate = ref(null);
 const today = new Date();
 const currentDateDisplayed = ref('');
+const activeFilter = ref('all'); // 'all' o 'favorites'
 
+// --- COMPUTED PROPERTIES DESDE EL STORE Y DATOS ---
 const fullUserData = computed(() => userStore.fullUserData);
+const favoriteCards = computed(() => userStore.favoriteCards);
+const dias = computed(() => fullUserData.value?.dias ?? {}).value;
 const data = fullUserData.value;
 
-var dias = data?.dias ?? {};
-const availableDates = ref(
+const availableDates = computed(() =>
     Object.keys(dias)
         .map((dateString) => {
             const parts = dateString.split('-');
@@ -21,6 +30,97 @@ const availableDates = ref(
         })
         .sort((a, b) => b.getTime() - a.getTime())
 );
+
+// --- LÓGICA DE FAVORITOS (CONECTADA AL BACKEND) ---
+
+/**
+ * Se ejecuta al cargar el componente. Obtiene los favoritos del usuario desde el backend.
+ */
+onMounted(async () => {
+    try {
+        // Llama a tu API para obtener la lista de favoritos guardada.
+        const response = await axios.post(apiGetFavorites, {
+            // 3. Usamos los datos REALES del store en lugar de placeholders.
+            userId: fullUserData.value.userId,
+            idToken: 'string'
+        });
+
+        if (response.data && response.data.success) {
+            // Si la llamada fue exitosa, actualiza el estado en Pinia.
+            userStore.setFavorites(response.data.favorites);
+        }
+    } catch (error) {
+        console.error('Error al cargar los favoritos iniciales desde el backend:', error);
+    }
+});
+
+/**
+ * Gestiona el clic en un corazón para añadir/quitar de favoritos.
+ * @param {string} cardIdentifier - El identificador único de la tarjeta.
+ */
+const toggleFavorite = async (cardIdentifier) => {
+    const currentFavorites = favoriteCards.value;
+    let newFavorites;
+
+    if (currentFavorites.includes(cardIdentifier)) {
+        newFavorites = currentFavorites.filter((fav) => fav !== cardIdentifier);
+    } else {
+        newFavorites = [...currentFavorites, cardIdentifier];
+    }
+
+    try {
+        // Llama a tu API para guardar la nueva lista en la base de datos.
+        await axios.post(apiSetFavorites, {
+            Credentials: {
+                // Tu código Flutter usa "credentials" (minúscula)
+                userId: fullUserData.value.userId,
+                idToken: 'string' // Placeholder, tu backend Flutter lo maneja
+            },
+            Favorites: newFavorites
+        });
+
+        // Si la API responde con éxito, actualizamos nuestro estado local en Pinia.
+        userStore.setFavorites(newFavorites);
+    } catch (error) {
+        console.error('Error al guardar el favorito en el backend:', error);
+        alert('No se pudo guardar el cambio. Por favor, inténtalo de nuevo.');
+    }
+};
+
+/**
+ * Comprueba si una tarjeta es favorita (leído desde Pinia).
+ * @param {string} cardIdentifier
+ * @returns {boolean}
+ */
+const isFavorite = (cardIdentifier) => {
+    return favoriteCards.value.includes(cardIdentifier);
+};
+
+/**
+ * Determina si una tarjeta debe ser visible según el filtro activo.
+ * @param {string} cardIdentifier
+ * @returns {boolean}
+ */
+const isCardVisible = (cardIdentifier) => {
+    if (activeFilter.value === 'all') {
+        return true;
+    }
+    return isFavorite(cardIdentifier);
+};
+
+// --- FUNCIONES AUXILIARES Y WATCHERS (Sin cambios) ---
+
+if (availableDates.value.length > 0) {
+    selectedDate.value = availableDates.value[0];
+}
+
+const formatDate = (date) => {
+    if (!date) return null;
+    const year = date.getFullYear();
+    const month = String(date.getMonth() + 1).padStart(2, '0');
+    const day = String(date.getDate()).padStart(2, '0');
+    return `${year}-${month}-${day}`;
+};
 
 const updateCurrentDateDisplayed = (date) => {
     if (date) {
@@ -31,63 +131,27 @@ const updateCurrentDateDisplayed = (date) => {
     }
 };
 
-if (availableDates.value.length > 0) {
-    selectedDate.value = availableDates.value[0];
-    updateCurrentDateDisplayed(selectedDate.value);
-}
+watch(selectedDate, updateCurrentDateDisplayed, { immediate: true });
 
-onMounted(() => {
-    const btnAll = document.getElementById('btn-all');
-    const btnFavorites = document.getElementById('btn-favorites');
-
-    if (btnAll) {
-        btnAll.addEventListener('click', showAllCards);
-    }
-    if (btnFavorites) {
-        btnFavorites.addEventListener('click', showFavoriteCards);
-    }
-
-    document.addEventListener('click', (e) => {
-        const toggle = e.target.closest('.favorite-toggle');
-        if (!toggle) return;
-        e.stopPropagation();
-
-        const card = toggle.closest('.stat-card');
-        const isFavorite = card.getAttribute('data-favorite') === 'true';
-
-        if (!isFavorite) {
-            card.setAttribute('data-favorite', 'true');
-            if (toggle.tagName.toLowerCase() === 'i') {
-                const svgMarkup = `
-          <svg xmlns="http://www.w3.org/2000/svg" class="!text-xl absolute top-1 left-1 p-1 cursor-pointer favorite-toggle text-pink-400" preserveAspectRatio="xMidYMid meet">
-            <g transform="translate(.000000,25.000000) scale(0.050000,-0.050000)" fill="#f472b6">
-              <path d="M103 378 c-12 -6 -29 -26 -39 -46 -25 -53 -7 -98 64 -164 81 -74 104 -85 139 -67 54 28 142 120 154 159 14 45 0 91 -35 115 -27 19 -96 19 -123 0 -19 -13 -24 -13 -50 0 -32 17 -78 18 -110 3z m65 -50 c-6 -18 -28 -21 -28 -4 0 9 7 16 16 16 9 0 14 -5 12 -12z"></path>
-            </g>
-          </svg>`;
-                toggle.outerHTML = svgMarkup;
-            }
-        } else {
-            card.setAttribute('data-favorite', 'false');
-            if (toggle.tagName.toLowerCase() === 'svg') {
-                const id = toggle.getAttribute('id') ? ` id="${toggle.getAttribute('id')}"` : '';
-                const iconMarkup = `<i class="pi pi-heart !text-xl absolute top-1 left-1 p-1 cursor-pointer favorite-toggle text-pink-400"${id}></i>`;
-                toggle.outerHTML = iconMarkup;
-            }
-        }
-    });
-});
-
-const formatDate = (date) => {
-    if (!date) return null;
-    const year = date.getFullYear();
-    const month = String(date.getMonth() + 1).padStart(2, '0');
-    const day = String(date.getDate()).padStart(2, '0');
-    return `${year}-${month}-${day}`;
+const isDateSelectable = (date) => {
+    return availableDates.value.some((availableDate) => availableDate.getFullYear() === date.getFullYear() && availableDate.getMonth() === date.getMonth() && availableDate.getDate() === date.getDate());
 };
 
 const stepsValue = computed(() => dias[formatDate(selectedDate.value)]?.steps ?? 'Sin valor');
 const caloriesValue = computed(() => dias[formatDate(selectedDate.value)]?.activeCalories ?? 'Sin valor');
-const averageHrValue = computed(() => dias[formatDate(selectedDate.value)]?.avgHeartRate ?? 'Sin valor');
+const averageHrValue = computed(() => {
+    // Se obtiene el valor del ritmo cardíaco promedio.
+    const avgHr = dias[formatDate(selectedDate.value)]?.avgHeartRate;
+
+    // Se comprueba si el valor es un número.
+    if (typeof avgHr === 'number') {
+        // Si es un número, se formatea a 2 decimales y se devuelve como texto.
+        return avgHr.toFixed(2);
+    }
+
+    // Si no hay valor o no es un número, se devuelve el texto por defecto.
+    return 'Sin valor';
+});
 const minHrValue = computed(() => dias[formatDate(selectedDate.value)]?.minHeartRate ?? 'Sin valor');
 const maxHrValue = computed(() => dias[formatDate(selectedDate.value)]?.maxHeartRate ?? 'Sin valor');
 const restingHrValue = computed(() => dias[formatDate(selectedDate.value)]?.restingHeartRate ?? 'Sin valor');
@@ -130,31 +194,14 @@ const isCaloriesValueUnhealthy = computed(() => caloriesValue.value !== 'Sin val
 const isAverageHrValueUnhealthy = computed(() => averageHrValue.value !== 'Sin valor' && (averageHrValue.value < 60 || averageHrValue.value > 100));
 const isMinHrValueUnhealthy = computed(() => minHrValue.value !== 'Sin valor' && minHrValue.value < 60);
 const isMaxHrValueUnhealthy = computed(() => maxHrValue.value !== 'Sin valor' && maxHrValue.value > 140);
-
-const showAllCards = () => {
-    document.querySelectorAll('.stat-card').forEach((card) => {
-        card.style.display = '';
-    });
-};
-
-const showFavoriteCards = () => {
-    document.querySelectorAll('.stat-card').forEach((card) => {
-        card.style.display = card.getAttribute('data-favorite') === 'true' ? '' : 'none';
-    });
-};
-
 watch(selectedDate, (newDate) => {
     updateCurrentDateDisplayed(newDate);
 });
-
-const isDateSelectable = (date) => {
-    return availableDates.value.some((availableDate) => availableDate.getFullYear() === date.getFullYear() && availableDate.getMonth() === date.getMonth() && availableDate.getDate() === date.getDate());
-};
 </script>
 
 <template>
     <div class="mb-4 col-span-12 flex justify-center space-x-4">
-        <Button id="btn-favorites" rounded class="!bg-pink-400 !text-white !px-6 !py-2 !shadow !hover:bg-pink-600 !transition !border-0 !border-pink-300"> Favoritos </Button>
+        <Button @click="activeFilter = 'favorites'" rounded class="!bg-pink-400 !text-white !px-6 !py-2 !shadow !hover:bg-pink-600 !transition !border-0 !border-pink-300"> Favoritos </Button>
         <Calendar
             v-model="selectedDate"
             :maxDate="availableDates.length > 0 && availableDates[0] > today ? availableDates[0] : today"
@@ -164,13 +211,17 @@ const isDateSelectable = (date) => {
             :isDateDisabled="(date) => !isDateSelectable(date)"
             class="shadow-lg rounded-md"
         />
-        <Button id="btn-all" rounded class="!bg-blue-500 !text-white !px-6 !py-1 !shadow !transition !border-0 !border-blue-300"> Todos </Button>
+        <Button @click="activeFilter = 'all'" rounded class="!bg-blue-500 !text-white !px-6 !py-2 !shadow !transition !border-0 !border-blue-300"> Todos </Button>
     </div>
 
-    <div class="col-span-12 lg:col-span-6 xl:col-span-3 stat-card" data-filter="calorias" data-favorite="false">
+    <div v-show="isCardVisible('pasos')" class="col-span-12 lg:col-span-6 xl:col-span-3 stat-card">
         <div :class="['card', 'mb-0', 'relative', { 'pulse-yellow': isStepValueUnhealthy }]">
-            <i class="pi pi-heart !text-xl absolute top-1 left-1 p-1 cursor-pointer favorite-toggle text-pink-400" id="fav-icon-calorias"></i>
-
+            <span @click.stop="toggleFavorite('pasos')" class="absolute top-1 left-1 p-1 cursor-pointer">
+                <svg v-if="isFavorite('pasos')" xmlns="http://www.w3.org/2000/svg" class="!text-xl text-pink-400" width="24" height="24" viewBox="0 0 24 24" fill="currentColor">
+                    <path d="M12 21.35l-1.45-1.32C5.4 15.36 2 12.28 2 8.5 2 5.42 4.42 3 7.5 3c1.74 0 3.41.81 4.5 2.09C13.09 3.81 14.76 3 16.5 3 19.58 3 22 5.42 22 8.5c0 3.78-3.4 6.86-8.55 11.54L12 21.35z" />
+                </svg>
+                <i v-else class="pi pi-heart !text-xl text-pink-400"></i>
+            </span>
             <div class="flex justify-between mb-4">
                 <div>
                     <span class="block text-muted-color font-medium mb-4">Pasos</span>
@@ -183,9 +234,14 @@ const isDateSelectable = (date) => {
         </div>
     </div>
 
-    <div class="col-span-12 lg:col-span-6 xl:col-span-3 stat-card" data-filter="calorias" data-favorite="false">
+    <div v-show="isCardVisible('calorias_activas')" class="col-span-12 lg:col-span-6 xl:col-span-3 stat-card">
         <div :class="['card', 'mb-0', 'relative', { 'pulse-yellow': isCaloriesValueUnhealthy }]">
-            <i class="pi pi-heart !text-xl absolute top-1 left-1 p-1 cursor-pointer favorite-toggle text-pink-400" id="fav-icon-calorias"></i>
+            <span @click.stop="toggleFavorite('calorias_activas')" class="absolute top-1 left-1 p-1 cursor-pointer">
+                <svg v-if="isFavorite('calorias_activas')" xmlns="http://www.w3.org/2000/svg" class="!text-xl text-pink-400" width="24" height="24" viewBox="0 0 24 24" fill="currentColor">
+                    <path d="M12 21.35l-1.45-1.32C5.4 15.36 2 12.28 2 8.5 2 5.42 4.42 3 7.5 3c1.74 0 3.41.81 4.5 2.09C13.09 3.81 14.76 3 16.5 3 19.58 3 22 5.42 22 8.5c0 3.78-3.4 6.86-8.55 11.54L12 21.35z" />
+                </svg>
+                <i v-else class="pi pi-heart !text-xl text-pink-400"></i>
+            </span>
             <div class="flex justify-between mb-4">
                 <div>
                     <span class="block text-muted-color font-medium mb-4">Calorías Activas</span>
@@ -203,9 +259,14 @@ const isDateSelectable = (date) => {
         </div>
     </div>
 
-    <div class="col-span-12 lg:col-span-6 xl:col-span-3 stat-card" data-filter="fc_promedio" data-favorite="false">
+    <div v-show="isCardVisible('fc_promedio')" class="col-span-12 lg:col-span-6 xl:col-span-3 stat-card">
         <div :class="['card', 'mb-0', 'relative', { 'pulse-red': isAverageHrValueUnhealthy }]">
-            <i class="pi pi-heart !text-xl absolute top-1 left-1 p-1 cursor-pointer favorite-toggle text-pink-400" id="fav-icon-fc_promedio"></i>
+            <span @click.stop="toggleFavorite('fc_promedio')" class="absolute top-1 left-1 p-1 cursor-pointer">
+                <svg v-if="isFavorite('fc_promedio')" xmlns="http://www.w3.org/2000/svg" class="!text-xl text-pink-400" width="24" height="24" viewBox="0 0 24 24" fill="currentColor">
+                    <path d="M12 21.35l-1.45-1.32C5.4 15.36 2 12.28 2 8.5 2 5.42 4.42 3 7.5 3c1.74 0 3.41.81 4.5 2.09C13.09 3.81 14.76 3 16.5 3 19.58 3 22 5.42 22 8.5c0 3.78-3.4 6.86-8.55 11.54L12 21.35z" />
+                </svg>
+                <i v-else class="pi pi-heart !text-xl text-pink-400"></i>
+            </span>
             <div class="flex justify-between mb-4">
                 <div>
                     <span class="block text-muted-color font-medium mb-4">FC Promedio</span>
@@ -218,9 +279,14 @@ const isDateSelectable = (date) => {
         </div>
     </div>
 
-    <div class="col-span-12 lg:col-span-6 xl:col-span-3 stat-card" data-filter="fc_minima" data-favorite="false">
+    <div v-show="isCardVisible('fc_minima')" class="col-span-12 lg:col-span-6 xl:col-span-3 stat-card">
         <div :class="['card', 'mb-0', 'relative', { 'pulse-red': isMinHrValueUnhealthy }]">
-            <i class="pi pi-heart !text-xl absolute top-1 left-1 p-1 cursor-pointer favorite-toggle text-pink-400" id="fav-icon-fc_minima"></i>
+            <span @click.stop="toggleFavorite('fc_minima')" class="absolute top-1 left-1 p-1 cursor-pointer">
+                <svg v-if="isFavorite('fc_minima')" xmlns="http://www.w3.org/2000/svg" class="!text-xl text-pink-400" width="24" height="24" viewBox="0 0 24 24" fill="currentColor">
+                    <path d="M12 21.35l-1.45-1.32C5.4 15.36 2 12.28 2 8.5 2 5.42 4.42 3 7.5 3c1.74 0 3.41.81 4.5 2.09C13.09 3.81 14.76 3 16.5 3 19.58 3 22 5.42 22 8.5c0 3.78-3.4 6.86-8.55 11.54L12 21.35z" />
+                </svg>
+                <i v-else class="pi pi-heart !text-xl text-pink-400"></i>
+            </span>
             <div class="flex justify-between mb-4">
                 <div>
                     <span class="block text-muted-color font-medium mb-4">FC Mínima</span>
@@ -233,9 +299,14 @@ const isDateSelectable = (date) => {
         </div>
     </div>
 
-    <div class="col-span-12 lg:col-span-6 xl:col-span-3 stat-card" data-filter="fc_maxima" data-favorite="false">
+    <div v-show="isCardVisible('fc_maxima')" class="col-span-12 lg:col-span-6 xl:col-span-3 stat-card">
         <div :class="['card', 'mb-0', 'relative', { 'pulse-red': isMaxHrValueUnhealthy }]">
-            <i class="pi pi-heart !text-xl absolute top-1 left-1 p-1 cursor-pointer favorite-toggle text-pink-400" id="fav-icon-fc_maxima"></i>
+            <span @click.stop="toggleFavorite('fc_maxima')" class="absolute top-1 left-1 p-1 cursor-pointer">
+                <svg v-if="isFavorite('fc_maxima')" xmlns="http://www.w3.org/2000/svg" class="!text-xl text-pink-400" width="24" height="24" viewBox="0 0 24 24" fill="currentColor">
+                    <path d="M12 21.35l-1.45-1.32C5.4 15.36 2 12.28 2 8.5 2 5.42 4.42 3 7.5 3c1.74 0 3.41.81 4.5 2.09C13.09 3.81 14.76 3 16.5 3 19.58 3 22 5.42 22 8.5c0 3.78-3.4 6.86-8.55 11.54L12 21.35z" />
+                </svg>
+                <i v-else class="pi pi-heart !text-xl text-pink-400"></i>
+            </span>
             <div class="flex justify-between mb-4">
                 <div>
                     <span class="block text-muted-color font-medium mb-4">FC Máxima</span>
@@ -248,9 +319,14 @@ const isDateSelectable = (date) => {
         </div>
     </div>
 
-    <div class="col-span-12 lg:col-span-6 xl:col-span-3 stat-card" data-filter="fc_reposo" data-favorite="false">
+    <div v-show="isCardVisible('fc_reposo')" class="col-span-12 lg:col-span-6 xl:col-span-3 stat-card">
         <div :class="['card', 'mb-0', 'relative', { 'pulse-red': isRestingHrValueUnhealthy }]">
-            <i class="pi pi-heart !text-xl absolute top-1 left-1 p-1 cursor-pointer favorite-toggle text-pink-400" id="fav-icon-fc_reposo"></i>
+            <span @click.stop="toggleFavorite('fc_reposo')" class="absolute top-1 left-1 p-1 cursor-pointer">
+                <svg v-if="isFavorite('fc_reposo')" xmlns="http://www.w3.org/2000/svg" class="!text-xl text-pink-400" width="24" height="24" viewBox="0 0 24 24" fill="currentColor">
+                    <path d="M12 21.35l-1.45-1.32C5.4 15.36 2 12.28 2 8.5 2 5.42 4.42 3 7.5 3c1.74 0 3.41.81 4.5 2.09C13.09 3.81 14.76 3 16.5 3 19.58 3 22 5.42 22 8.5c0 3.78-3.4 6.86-8.55 11.54L12 21.35z" />
+                </svg>
+                <i v-else class="pi pi-heart !text-xl text-pink-400"></i>
+            </span>
             <div class="flex justify-between mb-4">
                 <div>
                     <span class="block text-muted-color font-medium mb-4">FC en Reposo</span>
@@ -269,9 +345,14 @@ const isDateSelectable = (date) => {
         </div>
     </div>
 
-    <div class="col-span-12 lg:col-span-6 xl:col-span-3 stat-card" data-filter="peso" data-favorite="false">
+    <div v-show="isCardVisible('peso')" class="col-span-12 lg:col-span-6 xl:col-span-3 stat-card">
         <div :class="['card', 'mb-0', 'relative', { 'pulse-red': isWeightValueUnhealthy }]">
-            <i class="pi pi-heart !text-xl absolute top-1 left-1 p-1 cursor-pointer favorite-toggle text-pink-400" id="fav-icon-peso"></i>
+            <span @click.stop="toggleFavorite('peso')" class="absolute top-1 left-1 p-1 cursor-pointer">
+                <svg v-if="isFavorite('peso')" xmlns="http://www.w3.org/2000/svg" class="!text-xl text-pink-400" width="24" height="24" viewBox="0 0 24 24" fill="currentColor">
+                    <path d="M12 21.35l-1.45-1.32C5.4 15.36 2 12.28 2 8.5 2 5.42 4.42 3 7.5 3c1.74 0 3.41.81 4.5 2.09C13.09 3.81 14.76 3 16.5 3 19.58 3 22 5.42 22 8.5c0 3.78-3.4 6.86-8.55 11.54L12 21.35z" />
+                </svg>
+                <i v-else class="pi pi-heart !text-xl text-pink-400"></i>
+            </span>
             <div class="flex justify-between mb-4">
                 <div>
                     <span class="block text-muted-color font-medium mb-4">Peso</span>
@@ -290,9 +371,14 @@ const isDateSelectable = (date) => {
         </div>
     </div>
 
-    <div class="col-span-12 lg:col-span-6 xl:col-span-3 stat-card" data-filter="altura" data-favorite="false">
+    <div v-show="isCardVisible('altura')" class="col-span-12 lg:col-span-6 xl:col-span-3 stat-card">
         <div :class="['card', 'mb-0', 'relative', {}]">
-            <i class="pi pi-heart !text-xl absolute top-1 left-1 p-1 cursor-pointer favorite-toggle text-pink-400" id="fav-icon-altura"></i>
+            <span @click.stop="toggleFavorite('altura')" class="absolute top-1 left-1 p-1 cursor-pointer">
+                <svg v-if="isFavorite('altura')" xmlns="http://www.w3.org/2000/svg" class="!text-xl text-pink-400" width="24" height="24" viewBox="0 0 24 24" fill="currentColor">
+                    <path d="M12 21.35l-1.45-1.32C5.4 15.36 2 12.28 2 8.5 2 5.42 4.42 3 7.5 3c1.74 0 3.41.81 4.5 2.09C13.09 3.81 14.76 3 16.5 3 19.58 3 22 5.42 22 8.5c0 3.78-3.4 6.86-8.55 11.54L12 21.35z" />
+                </svg>
+                <i v-else class="pi pi-heart !text-xl text-pink-400"></i>
+            </span>
             <div class="flex justify-between mb-4">
                 <div>
                     <span class="block text-muted-color font-medium mb-4">Altura</span>
@@ -333,9 +419,14 @@ const isDateSelectable = (date) => {
         </div>
     </div>
 
-    <div class="col-span-12 lg:col-span-6 xl:col-span-3 stat-card" data-filter="presion_sistolica" data-favorite="false">
+    <div v-show="isCardVisible('presion_sistolica')" class="col-span-12 lg:col-span-6 xl:col-span-3 stat-card">
         <div :class="['card', 'mb-0', 'relative', { 'pulse-red': isSistolicValueUnhealthy }]">
-            <i class="pi pi-heart !text-xl absolute top-1 left-1 p-1 cursor-pointer favorite-toggle text-pink-400" id="fav-icon-sistolica"></i>
+            <span @click.stop="toggleFavorite('presion_sistolica')" class="absolute top-1 left-1 p-1 cursor-pointer">
+                <svg v-if="isFavorite('presion_sistolica')" xmlns="http://www.w3.org/2000/svg" class="!text-xl text-pink-400" width="24" height="24" viewBox="0 0 24 24" fill="currentColor">
+                    <path d="M12 21.35l-1.45-1.32C5.4 15.36 2 12.28 2 8.5 2 5.42 4.42 3 7.5 3c1.74 0 3.41.81 4.5 2.09C13.09 3.81 14.76 3 16.5 3 19.58 3 22 5.42 22 8.5c0 3.78-3.4 6.86-8.55 11.54L12 21.35z" />
+                </svg>
+                <i v-else class="pi pi-heart !text-xl text-pink-400"></i>
+            </span>
             <div class="flex justify-between mb-4">
                 <div>
                     <span class="block text-muted-color font-medium mb-4">Presión Sistólica</span>
@@ -348,9 +439,14 @@ const isDateSelectable = (date) => {
         </div>
     </div>
 
-    <div class="col-span-12 lg:col-span-6 xl:col-span-3 stat-card" data-filter="presion_diastolica" data-favorite="false">
+    <div v-show="isCardVisible('presion_diastolica')" class="col-span-12 lg:col-span-6 xl:col-span-3 stat-card">
         <div :class="['card', 'mb-0', 'relative', { 'pulse-red': isDiastolicValueUnhealthy }]">
-            <i class="pi pi-heart !text-xl absolute top-1 left-1 p-1 cursor-pointer favorite-toggle text-pink-400" id="fav-icon-diastolica"></i>
+            <span @click.stop="toggleFavorite('presion_diastolica')" class="absolute top-1 left-1 p-1 cursor-pointer">
+                <svg v-if="isFavorite('presion_diastolica')" xmlns="http://www.w3.org/2000/svg" class="!text-xl text-pink-400" width="24" height="24" viewBox="0 0 24 24" fill="currentColor">
+                    <path d="M12 21.35l-1.45-1.32C5.4 15.36 2 12.28 2 8.5 2 5.42 4.42 3 7.5 3c1.74 0 3.41.81 4.5 2.09C13.09 3.81 14.76 3 16.5 3 19.58 3 22 5.42 22 8.5c0 3.78-3.4 6.86-8.55 11.54L12 21.35z" />
+                </svg>
+                <i v-else class="pi pi-heart !text-xl text-pink-400"></i>
+            </span>
             <div class="flex justify-between mb-4">
                 <div>
                     <span class="block text-muted-color font-medium mb-4">Presión Diastólica</span>
@@ -363,9 +459,14 @@ const isDateSelectable = (date) => {
         </div>
     </div>
 
-    <div class="col-span-12 lg:col-span-6 xl:col-span-3 stat-card" data-filter="saturacion_oxigeno" data-favorite="false">
+    <div v-show="isCardVisible('saturacion_oxigeno')" class="col-span-12 lg:col-span-6 xl:col-span-3 stat-card">
         <div :class="['card', 'mb-0', 'relative', { 'pulse-red': isOxigenValueUnhealthy }]">
-            <i class="pi pi-heart !text-xl absolute top-1 left-1 p-1 cursor-pointer favorite-toggle text-pink-400" id="fav-icon-oxigeno"></i>
+            <span @click.stop="toggleFavorite('saturacion_oxigeno')" class="absolute top-1 left-1 p-1 cursor-pointer">
+                <svg v-if="isFavorite('saturacion_oxigeno')" xmlns="http://www.w3.org/2000/svg" class="!text-xl text-pink-400" width="24" height="24" viewBox="0 0 24 24" fill="currentColor">
+                    <path d="M12 21.35l-1.45-1.32C5.4 15.36 2 12.28 2 8.5 2 5.42 4.42 3 7.5 3c1.74 0 3.41.81 4.5 2.09C13.09 3.81 14.76 3 16.5 3 19.58 3 22 5.42 22 8.5c0 3.78-3.4 6.86-8.55 11.54L12 21.35z" />
+                </svg>
+                <i v-else class="pi pi-heart !text-xl text-pink-400"></i>
+            </span>
             <div class="flex justify-between mb-4">
                 <div>
                     <span class="block text-muted-color font-medium mb-4">Saturación de Oxígeno</span>
@@ -378,9 +479,14 @@ const isDateSelectable = (date) => {
         </div>
     </div>
 
-    <div class="col-span-12 lg:col-span-6 xl:col-span-3 stat-card" data-filter="glucosa_sangre" data-favorite="false">
+    <div v-show="isCardVisible('glucosa_sangre')" class="col-span-12 lg:col-span-6 xl:col-span-3 stat-card">
         <div :class="['card', 'mb-0', 'relative', { 'pulse-red': isGlucoseValueUnhealthy }]">
-            <i class="pi pi-heart !text-xl absolute top-1 left-1 p-1 cursor-pointer favorite-toggle text-pink-400" id="fav-icon-glucosa"></i>
+            <span @click.stop="toggleFavorite('glucosa_sangre')" class="absolute top-1 left-1 p-1 cursor-pointer">
+                <svg v-if="isFavorite('glucosa_sangre')" xmlns="http://www.w3.org/2000/svg" class="!text-xl text-pink-400" width="24" height="24" viewBox="0 0 24 24" fill="currentColor">
+                    <path d="M12 21.35l-1.45-1.32C5.4 15.36 2 12.28 2 8.5 2 5.42 4.42 3 7.5 3c1.74 0 3.41.81 4.5 2.09C13.09 3.81 14.76 3 16.5 3 19.58 3 22 5.42 22 8.5c0 3.78-3.4 6.86-8.55 11.54L12 21.35z" />
+                </svg>
+                <i v-else class="pi pi-heart !text-xl text-pink-400"></i>
+            </span>
             <div class="flex justify-between mb-4">
                 <div>
                     <span class="block text-muted-color font-medium mb-4">Glucosa en Sangre</span>
@@ -399,9 +505,14 @@ const isDateSelectable = (date) => {
         </div>
     </div>
 
-    <div class="col-span-12 lg:col-span-6 xl:col-span-3 stat-card" data-filter="temperatura_corporal" data-favorite="false">
+    <div v-show="isCardVisible('temperatura_corporal')" class="col-span-12 lg:col-span-6 xl:col-span-3 stat-card">
         <div :class="['card', 'mb-0', 'relative', { 'pulse-red': isTemperatureValueUnhealthy }]">
-            <i class="pi pi-heart !text-xl absolute top-1 left-1 p-1 cursor-pointer favorite-toggle text-pink-400" id="fav-icon-temperatura"></i>
+            <span @click.stop="toggleFavorite('temperatura_corporal')" class="absolute top-1 left-1 p-1 cursor-pointer">
+                <svg v-if="isFavorite('temperatura_corporal')" xmlns="http://www.w3.org/2000/svg" class="!text-xl text-pink-400" width="24" height="24" viewBox="0 0 24 24" fill="currentColor">
+                    <path d="M12 21.35l-1.45-1.32C5.4 15.36 2 12.28 2 8.5 2 5.42 4.42 3 7.5 3c1.74 0 3.41.81 4.5 2.09C13.09 3.81 14.76 3 16.5 3 19.58 3 22 5.42 22 8.5c0 3.78-3.4 6.86-8.55 11.54L12 21.35z" />
+                </svg>
+                <i v-else class="pi pi-heart !text-xl text-pink-400"></i>
+            </span>
             <div class="flex justify-between mb-4">
                 <div>
                     <span class="block text-muted-color font-medium mb-4">Temperatura</span>
@@ -420,9 +531,14 @@ const isDateSelectable = (date) => {
         </div>
     </div>
 
-    <div class="col-span-12 lg:col-span-6 xl:col-span-3 stat-card" data-filter="frecuencia_respiratoria" data-favorite="false">
-        <div :class="['card', 'mb-0', 'relative', { 'pulse-yelow': isRespiratoryFCValueUnhealthy }]">
-            <i class="pi pi-heart !text-xl absolute top-1 left-1 p-1 cursor-pointer favorite-toggle text-pink-400" id="fav-icon-frecuencia_respiratoria"></i>
+    <div v-show="isCardVisible('frecuencia_respiratoria')" class="col-span-12 lg:col-span-6 xl:col-span-3 stat-card">
+        <div :class="['card', 'mb-0', 'relative', { 'pulse-yellow': isRespiratoryFCValueUnhealthy }]">
+            <span @click.stop="toggleFavorite('frecuencia_respiratoria')" class="absolute top-1 left-1 p-1 cursor-pointer">
+                <svg v-if="isFavorite('frecuencia_respiratoria')" xmlns="http://www.w3.org/2000/svg" class="!text-xl text-pink-400" width="24" height="24" viewBox="0 0 24 24" fill="currentColor">
+                    <path d="M12 21.35l-1.45-1.32C5.4 15.36 2 12.28 2 8.5 2 5.42 4.42 3 7.5 3c1.74 0 3.41.81 4.5 2.09C13.09 3.81 14.76 3 16.5 3 19.58 3 22 5.42 22 8.5c0 3.78-3.4 6.86-8.55 11.54L12 21.35z" />
+                </svg>
+                <i v-else class="pi pi-heart !text-xl text-pink-400"></i>
+            </span>
             <div class="flex justify-between mb-4">
                 <div>
                     <span class="block text-muted-color font-medium mb-4">Frecuencia Respiratoria</span>

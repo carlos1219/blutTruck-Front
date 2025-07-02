@@ -15,8 +15,12 @@ const checked = ref(false);
 const errorMessage = ref('');
 const router = useRouter();
 const userStore = useUserStore();
-
-const baseUrl = 'http://192.168.1.152:3000';
+const baseUrl = 'https://bluttruck.grial.eu/backend';
+const isForgotPasswordDialogVisible = ref(false);
+const resetEmail = ref('');
+const resetMessage = ref('');
+const isResetError = ref(false);
+const isSendingResetLink = ref(false);
 
 // Lógica para recordar email/pass (sin cambios)
 const storedEmail = localStorage.getItem('rememberMeEmail');
@@ -159,6 +163,45 @@ const signInWithGoogleFirebase = async () => {
 const goToLandingPage = () => {
     router.push('/'); // Navega a la ruta raíz
 };
+
+// Función para abrir el diálogo y limpiar su estado
+const openForgotPasswordDialog = () => {
+    resetEmail.value = '';
+    resetMessage.value = '';
+    isResetError.value = false;
+    isForgotPasswordDialogVisible.value = true;
+};
+
+// ¡ESTA ES LA LÓGICA CLAVE! Llama a tu backend, no a Firebase
+const handlePasswordReset = async () => {
+    if (!resetEmail.value) {
+        isResetError.value = true;
+        resetMessage.value = 'Por favor, introduce tu correo electrónico.';
+        return;
+    }
+
+    isSendingResetLink.value = true;
+    isResetError.value = false;
+    resetMessage.value = '';
+
+    try {
+        // Llama al endpoint que creaste en tu AuthController
+        const response = await axios.post(`${baseUrl}/api/WriteData/forgot-password`, {
+            Email: resetEmail.value
+        });
+
+        // Muestra el mensaje de éxito que te devuelve el backend
+        resetMessage.value = response.data.message;
+        isResetError.value = false;
+    } catch (error) {
+        console.error('Error al llamar al backend para reseteo:', error);
+        isResetError.value = true;
+        // Muestra un mensaje genérico en caso de error de red u otro problema.
+        resetMessage.value = 'Ocurrió un error en el servidor. Inténtalo de nuevo más tarde.';
+    } finally {
+        isSendingResetLink.value = false;
+    }
+};
 </script>
 
 <template>
@@ -192,7 +235,8 @@ const goToLandingPage = () => {
                                 <input type="checkbox" id="rememberme1" v-model="checked" class="mr-2 border rounded-md shadow-sm focus:ring-blue-500 focus:border-blue-500 dark:bg-surface-700 dark:border-surface-600 dark:text-white" />
                                 <label for="rememberme1">Recuérdame</label>
                             </div>
-                            <span class="font-medium no-underline ml-2 text-right cursor-pointer text-blue-500"> ¿Has olvidado la contraseña? </span>
+
+                            <a @click="openForgotPasswordDialog" class="font-medium no-underline ml-2 text-right cursor-pointer text-blue-500 hover:text-blue-700"> ¿Has olvidado la contraseña? </a>
                         </div>
 
                         <Button label="Iniciar sesión" class="w-full !bg-blue-500 !border-blue-500 mb-4" @click="loginUser"></Button>
@@ -207,6 +251,23 @@ const goToLandingPage = () => {
             </div>
         </div>
     </div>
+
+    <Dialog header="Restablecer Contraseña" v-model:visible="isForgotPasswordDialogVisible" modal :style="{ width: '25rem' }">
+        <span class="text-muted-color block mb-4"> Ingresa tu correo electrónico y te enviaremos un enlace para restablecer tu contraseña. </span>
+        <div class="flex flex-col gap-2">
+            <label for="reset-email" class="font-semibold">Correo electrónico</label>
+            <InputText id="reset-email" class="w-full" v-model="resetEmail" @keyup.enter="handlePasswordReset" />
+        </div>
+
+        <div v-if="resetMessage" class="mt-4 text-center p-2 rounded-md" :class="isResetError ? 'bg-red-100 text-red-700' : 'bg-green-100 text-green-700'">
+            {{ resetMessage }}
+        </div>
+
+        <template #footer>
+            <Button label="Cancelar" class="!text-blue-500" @click="isForgotPasswordDialogVisible = false" text />
+            <Button label="Enviar Enlace" class="!bg-blue-500 !border-blue-500" @click="handlePasswordReset" :loading="isSendingResetLink" />
+        </template>
+    </Dialog>
 </template>
 
 <style scoped>

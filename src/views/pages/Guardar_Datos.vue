@@ -190,8 +190,6 @@ async function handleSubmit() {
             throw new Error('No se pudo obtener el ID del usuario.');
         }
 
-        // Construir healthDataForApi con la estructura que espera tu backend C#
-        // (que es similar a la de Flutter, usando claves en minúscula según tu código Flutter)
         const healthDataForApi = {
             userId: userId, // Flutter usa "userId"
             steps: payloadForStore.steps,
@@ -199,12 +197,9 @@ async function handleSubmit() {
             restingHeartRate: payloadForStore.restingHeartRate,
             weight: payloadForStore.weight,
             height: payloadForStore.height,
-            // Para bodyTemperature, Flutter envía el más reciente. Replicamos eso.
+
             bodyTemperature: form.value.bodyTemperature != null && form.value.bodyTemperature !== '' ? parseFloat(form.value.bodyTemperature) : null,
 
-            // Series temporales: enviar el array completo del día (incluyendo datos previos si los hay)
-            // o solo la nueva entrada, dependiendo de cómo esté diseñada tu API "writeWeb".
-            // Por consistencia con Flutter que envía todo el día, aquí enviaremos el estado actual del store para ese día.
             heartRateData: existingDataForDay.heartRateData || [],
             bloodPressureData: existingDataForDay.bloodPressureData || [],
             bloodGlucoseData: existingDataForDay.bloodGlucoseData || [],
@@ -233,7 +228,7 @@ async function handleSubmit() {
         };
 
         console.log('Enviando Payload a API (writeWeb):', JSON.stringify(requestBodyForApi, null, 2));
-        const apiUrl = 'http://localhost:3000/api/WriteData/writeWeb'; // Reemplaza con tu URL real
+        const apiUrl = 'https://bluttruck.grial.eu/backend/api/WriteData/writeWeb'; // Reemplaza con tu URL real
         const response = await axios.post(apiUrl, requestBodyForApi);
 
         if (response.status === 200 || response.status === 201) {
